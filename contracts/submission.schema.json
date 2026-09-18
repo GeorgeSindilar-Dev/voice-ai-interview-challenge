@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/anujb-msft/voice-ai-interview-challenge/main/contracts/submission.schema.json",
+  "$comment": "Patterns use (?![\\s\\S]) for strict end-of-input; unlike $, this rejects a trailing line terminator.",
+  "title": "Voice AI challenge submission v1",
+  "description": "Private submission metadata, not credentials. The example file is an incomplete template, not a live target.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "stage",
+    "submission_id",
+    "phone_e164",
+    "reset_base_url",
+    "repository_url",
+    "commit_sha",
+    "azure_architecture",
+    "setup_document",
+    "video_url"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "stage": {
+      "type": "string",
+      "enum": ["initial", "walkthrough"]
+    },
+    "submission_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S",
+      "description": "Nonblank private identifier, stable across submission stages."
+    },
+    "phone_e164": {
+      "type": "string",
+      "pattern": "^\\+1(?:800|833|844|855|866|877|888)[2-9][0-9]{6}(?![\\s\\S])",
+      "description": "Actual assigned US toll-free NANP number in E.164 form. No default or dialable example is supplied."
+    },
+    "reset_base_url": {
+      "type": "string",
+      "$ref": "#/$defs/httpsUrl",
+      "pattern": "^https://[^\\s/@?#]+(?:/[^\\s?#]*)?(?![\\s\\S])",
+      "description": "Registered HTTPS browser entry URL, with no userinfo, query, or fragment. The issuer appends a token fragment."
+    },
+    "repository_url": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://github\\.com/[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?/[A-Za-z0-9_.-]+/?(?![\\s\\S])",
+      "description": "HTTPS github.com repository root URL. Private repositories are allowed with reviewer access; no credentials, query, fragment, or subpaths."
+    },
+    "commit_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{40}(?![\\s\\S])",
+      "description": "Full commit SHA corresponding to the submitted deployment and setup document."
+    },
+    "azure_architecture": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "pattern": "\\S",
+      "description": "Short Azure speech/LLM and ACS/Teams telephony architecture description."
+    },
+    "setup_document": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!\\s*$)[^/\\\\:\\u0000-\\u001F\\u007F]+(?:/[^/\\\\:\\u0000-\\u001F\\u007F]+)*(?![\\s\\S])",
+      "description": "Forward-slash repo-relative path to a tracked setup file at commit_sha. No absolute paths, dot/dot-dot segments, drive prefixes, or external symlinks."
+    },
+    "video_url": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/httpsUrl"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Private reviewer-accessible recorded walkthrough URL (or arranged accessible equivalent). May be null initially; required nonnull for walkthrough."
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional limitations and operational context; no keys, tokens, passwords, or raw logs."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "stage": {
+            "const": "walkthrough"
+          }
+        },
+        "required": ["stage"]
+      },
+      "then": {
+        "properties": {
+          "video_url": {
+            "$ref": "#/$defs/httpsUrl"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "httpsUrl": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://[^\\s/@?#]+(?:[/?#][^\\s]*)?(?![\\s\\S])",
+      "description": "HTTPS URL without whitespace or userinfo. Consumers must also parse the URL, validate its authority, and verify access; a pattern is not a network/provenance check."
+    }
+  }
+}

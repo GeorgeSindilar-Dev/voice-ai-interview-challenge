@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0",
+  "stage": "initial",
+  "submission_id": "REPLACE_WITH_PRIVATE_SUBMISSION_ID",
+  "phone_e164": "REPLACE_WITH_ASSIGNED_US_TOLL_FREE_E164",
+  "reset_base_url": "https://reset.example.invalid",
+  "repository_url": "https://github.com/REPLACE-WITH-OWNER/REPLACE-WITH-REPOSITORY",
+  "commit_sha": "REPLACE_WITH_40_HEX_COMMIT_SHA",
+  "azure_architecture": "REPLACE_WITH_YOUR_AZURE_SPEECH_LLM_AND_ACS_OR_TEAMS_ARCHITECTURE",
+  "setup_document": "REPLACE_WITH_REPO_RELATIVE_SETUP_PATH",
+  "video_url": null,
+  "notes": "TEMPLATE ONLY: replace all placeholders and share privately. This file is intentionally not a valid submission or live target."
+}
