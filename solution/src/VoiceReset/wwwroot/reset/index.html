@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Set a new password</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/site.css">
+</head>
+<body class="reset-page">
+  <main class="reset-card">
+    <h1>Set a new password</h1>
+    <div id="reset-message" class="reset-message" role="status" aria-live="polite"></div>
+
+    <form id="reset-form" class="reset-form" hidden>
+      <h2 id="policy-title">Password rules</h2>
+      <ul id="policy-rules" aria-labelledby="policy-title"></ul>
+
+      <label for="new-password">New password</label>
+      <input id="new-password" type="password"
+             autocomplete="new-password" autocapitalize="off" spellcheck="false" required>
+
+      <label for="confirm-password">Confirm new password</label>
+      <input id="confirm-password" type="password"
+             autocomplete="new-password" autocapitalize="off" spellcheck="false" required>
+
+      <button id="submit-button" type="submit">Change password</button>
+    </form>
+
+    <p class="reset-note">Never tell your password to the assistant on the call. Type it only on this page.</p>
+  </main>
+  <script type="module" src="/reset/reset.js"></script>
+</body>
+</html>

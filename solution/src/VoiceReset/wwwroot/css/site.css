@@ -1,0 +1,57 @@
+:root { color-scheme: light dark; font-family: system-ui, sans-serif; line-height: 1.5; }
+body { max-width: 40rem; margin: 2rem auto; padding: 0 1rem; }
+form { display: grid; gap: 0.5rem; }
+#inbox-header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+#messages { list-style: none; padding: 0; display: grid; gap: 1rem; }
+#messages article { border: 1px solid currentColor; border-radius: 0.5rem; padding: 0.75rem 1rem; }
+[role="alert"] { font-weight: bold; }
+
+/* Agent page (index.html) */
+:root { --accent: #1f5fbf; --danger: #b3261e; --danger-text: var(--danger); }
+/* The End button keeps the dark red (white text); only error text gets lighter on a dark background. */
+@media (prefers-color-scheme: dark) { :root { --danger-text: #ffb4ab; } }
+#access-section label { font-weight: 600; }
+#access-section input { font: inherit; padding: 0.5rem; width: 100%; max-width: 20rem; box-sizing: border-box; }
+#access-section button, #call-section button {
+  font: inherit;
+  justify-self: start;
+  padding: 0.6rem 1.2rem;
+  margin: 0.5rem 0.5rem 0.5rem 0;
+  border: none;
+  border-radius: 0.4rem;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+#access-section button:disabled, #call-section button:disabled { opacity: 0.5; cursor: default; }
+#access-section button:focus-visible, #access-section input:focus-visible, #call-section button:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+#end-button { background: var(--danger); }
+.error { color: var(--danger-text); font-weight: 600; }
+.status { font-weight: 600; }
+.captions { padding-left: 1.25rem; overflow-wrap: anywhere; }
+.captions li { margin-bottom: 0.4rem; }
+.note { font-size: 0.9rem; opacity: 0.8; }
+
+/* Reset form (/reset/) */
+.reset-page { color-scheme: light; max-width: none; min-height: 100vh; margin: 0; padding: 1.5rem 1rem;
+  box-sizing: border-box; background: #f4f6f8; color: #1b1f24; }
+.reset-card { max-width: 28rem; margin: 0 auto; background: #fff; border-radius: 0.5rem; padding: 1.5rem;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 15%); }
+.reset-card h1 { margin: 0 0 1rem; font-size: 1.4rem; }
+.reset-form { display: grid; gap: 0.5rem; }
+.reset-form[hidden], .reset-message:empty { display: none; }
+.reset-form ul, .reset-message ul { margin: 0.25rem 0 0.75rem; padding-left: 1.25rem; }
+.reset-form label { font-weight: 600; }
+.reset-form input { font: inherit; padding: 0.6rem; border: 1px solid #6b7380; border-radius: 0.3rem; }
+.reset-form button { font: inherit; margin-top: 0.75rem; padding: 0.7rem; border: 0; border-radius: 0.3rem;
+  background: #1f5fbf; color: #fff; cursor: pointer; }
+.reset-form button:disabled { background: #7d8da6; cursor: wait; }
+.reset-page :focus-visible { outline: 3px solid #f2a900; outline-offset: 2px; }
+.reset-message { margin-bottom: 1rem; padding: 0.75rem; border-radius: 0.3rem; background: #e8f0fb; }
+.reset-message p { margin: 0; }
+.reset-message[data-kind="error"] { background: #fde8e8; color: #7a1212; }
+.reset-message[data-kind="success"] { background: #e3f6e8; color: #145a2a; }
+.reset-note { margin: 1rem 0 0; font-size: 0.9rem; color: #4a5260; }

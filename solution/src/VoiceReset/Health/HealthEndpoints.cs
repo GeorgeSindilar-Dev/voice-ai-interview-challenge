@@ -7,7 +7,7 @@ public static class HealthEndpoints
     private const string Unknown = "unknown";
 
     private static readonly string s_commit = CommitFrom(
-        Assembly.GetEntryAssembly()?
+        typeof(HealthEndpoints).Assembly
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
             .InformationalVersion);
 

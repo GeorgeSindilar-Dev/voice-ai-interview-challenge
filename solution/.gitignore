@@ -4,3 +4,6 @@ submission.json
 # Build output
 bin/
 obj/
+
+# Test output
+TestResults/

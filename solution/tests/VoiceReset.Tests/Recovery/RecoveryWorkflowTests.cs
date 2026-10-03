@@ -1,0 +1,100 @@
+using VoiceReset.Recovery;
+
+namespace VoiceReset.Tests.Recovery;
+
+public sealed class RecoveryWorkflowTests
+{
+    private const string Spoken = "alex dot morgan";
+    private static CancellationToken Ct => TestContext.Current.CancellationToken;
+
+    [Fact]
+    public async Task SendResetLink_BeforeVerification_IsRefused()
+    {
+        await using var app = new RecoveryAppFactory();
+        var id = await app.StartRecoveryAsync(Spoken, Ct);
+
+        var result = await app.Workflow.SendResetLinkAsync(id, Ct);
+
+        Assert.Equal(new ToolResult(false, "not_allowed", Phrases.NotAllowed), result);
+        Assert.Equal(RecoveryState.AwaitingCode, await app.Workflow.GetStateAsync(id, Ct));
+    }
+
+    [Fact]
+    public async Task CheckResetStatus_FullJourney_SaysSuccessOnlyWithReceipt()
+    {
+        await using var app = new RecoveryAppFactory();
+        var id = await app.StartRecoveryAsync(Spoken, Ct);
+        var spokenCode = string.Join(' ', (await app.InboxCodeAsync(Ct)).AsEnumerable()); // "0 4 7 1 1 2"
+        Assert.Equal("verified", (await app.Workflow.SubmitCodeAsync(id, spokenCode, Ct)).Status);
+        Assert.Equal(Phrases.LinkSent, (await app.Workflow.SendResetLinkAsync(id, Ct)).Say);
+
+        var beforeReset = await app.Workflow.CheckResetStatusAsync(id, Ct);
+        await app.CompleteResetAsync(await app.InboxLinkAsync(Ct), Ct);
+        var afterReset = await app.Workflow.CheckResetStatusAsync(id, Ct);
+
+        Assert.Equal(Phrases.CantConfirmYet, beforeReset.Say);
+        Assert.Equal(Phrases.Completed, afterReset.Say);
+        var session = await app.SessionAsync(id, Ct);
+        Assert.NotNull(session?.ResetReceipt);
+        Assert.Equal("resolved", session?.TicketOutcome);
+    }
+
+    [Fact]
+    public async Task SubmitCode_Fragment_IsNotSubmitted()
+    {
+        await using var app = new RecoveryAppFactory();
+        var id = await app.StartRecoveryAsync(Spoken, Ct);
+
+        var fragment = await app.Workflow.SubmitCodeAsync(id, "4 7", Ct);
+        var wrong = await app.Workflow.SubmitCodeAsync(id, WrongCode(await app.InboxCodeAsync(Ct)), Ct);
+
+        Assert.Equal(new ToolResult(false, "invalid_code", Phrases.CodeUnclear), fragment);
+        Assert.Equal(Phrases.CodeIncorrect, wrong.Say); // one try left: the fragment used no attempt
+    }
+
+    [Fact]
+    public async Task SubmitCode_SecondWrongCode_EscalatesAsExhausted()
+    {
+        await using var app = new RecoveryAppFactory();
+        var id = await app.StartRecoveryAsync(Spoken, Ct);
+        var wrong = WrongCode(await app.InboxCodeAsync(Ct));
+        await app.Workflow.SubmitCodeAsync(id, wrong, Ct);
+
+        var second = await app.Workflow.SubmitCodeAsync(id, wrong, Ct);
+
+        Assert.Equal(new ToolResult(false, "exhausted", $"{Phrases.Exhausted} {Phrases.TicketCreated}"), second);
+        var session = await app.SessionAsync(id, Ct);
+        Assert.Equal(RecoveryState.Escalated, session?.State);
+        Assert.Equal("verification_exhausted", session?.TicketReason);
+    }
+
+    [Fact]
+    public async Task StartRecovery_SecondSessionSameAccount_DoesNotShareRecovery()
+    {
+        await using var app = new RecoveryAppFactory();
+        var first = await app.StartRecoveryAsync(Spoken, Ct);
+        await app.Workflow.SubmitCodeAsync(first, await app.InboxCodeAsync(Ct), Ct);
+
+        var second = await app.StartRecoveryAsync(Spoken, Ct); // throttled by the issuer: no recovery
+        var secondLink = await app.Workflow.SendResetLinkAsync(second, Ct);
+
+        Assert.Equal(RecoveryState.AwaitingUsername, await app.Workflow.GetStateAsync(second, Ct));
+        Assert.Equal("not_allowed", secondLink.Status);
+        Assert.Equal(RecoveryState.Verified, await app.Workflow.GetStateAsync(first, Ct));
+    }
+
+    [Fact]
+    public async Task EndCall_AgentEndedThenDropped_RecordsCallerCancelledOnce()
+    {
+        await using var app = new RecoveryAppFactory();
+        var id = await app.StartRecoveryAsync(Spoken, Ct);
+
+        await app.Workflow.EndCallAsync(id, "agent_ended", Ct);
+        await app.Workflow.EndCallAsync(id, "call_dropped", Ct);
+
+        var session = await app.SessionAsync(id, Ct);
+        Assert.Equal(("cancelled", "caller_cancelled", "agent_ended"), (session?.TicketOutcome, session?.TicketReason, session?.EndReason));
+    }
+
+    private static string WrongCode(string code) => code == "000000" ? "111111" : "000000";
+}

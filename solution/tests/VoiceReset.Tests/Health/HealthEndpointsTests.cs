@@ -1,20 +1,15 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Reflection;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using VoiceReset.Health;
 
 namespace VoiceReset.Tests.Health;
 
-public sealed class HealthEndpointsTests : IClassFixture<WebApplicationFactory<Program>>
+public sealed class HealthEndpointsTests(WebApplicationFactory<Program> factory)
+    : IClassFixture<WebApplicationFactory<Program>>
 {
-    private readonly WebApplicationFactory<Program> _factory;
-
-    public HealthEndpointsTests(WebApplicationFactory<Program> factory)
-    {
-        _factory = factory;
-    }
-
     [Theory]
     [InlineData("1.0.0+abc123", "abc123")]
     [InlineData("1.0.0", "unknown")]
@@ -33,7 +28,7 @@ public sealed class HealthEndpointsTests : IClassFixture<WebApplicationFactory<P
     public async Task GetHealth_Always_ReturnsOkWithStatusAndCommit()
     {
         // Arrange
-        using var client = _factory.CreateClient();
+        using var client = factory.CreateClient();
 
         // Act
         using var response = await client.GetAsync("/health", TestContext.Current.CancellationToken);
@@ -42,6 +37,9 @@ public sealed class HealthEndpointsTests : IClassFixture<WebApplicationFactory<P
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("ok", body.GetProperty("status").GetString());
-        Assert.False(string.IsNullOrEmpty(body.GetProperty("commit").GetString()));
+        var informationalVersion = typeof(HealthEndpoints).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+            .InformationalVersion;
+        Assert.Equal(HealthEndpoints.CommitFrom(informationalVersion), body.GetProperty("commit").GetString());
     }
 }
