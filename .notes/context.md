@@ -13,6 +13,14 @@ Facts and owner preferences that aren't obvious from the code. Read with `CLAUDE
   not a feature (`Http/`, `Observability/`, `Storage/`, possibly `Health/`) moves into one `Shared/`
   folder. Also remove unused code. Done after the app works end to end.
 - No local-run deliverable: everything is deployed to Azure.
+- **Ask before acting.** "Can you…?" or "what will you…?" is a question, not approval: answer only.
+  Run commands, Azure changes, deploys or pushes only after an explicit go. Keep replies very short.
+- **Git workflow:** work on a branch, commit and push after each step (so a cloud session can continue
+  if tokens run out), then squash-merge into `main` when the owner asks.
+- **Timeline:** deadline Monday 2026-10-05. No video: the result is discussed in a meeting with the
+  interviewer.
+- **Never run `dotnet dev-certs https --trust`** (it changes the Windows certificate store); the owner
+  runs it if needed.
 
 ## Status (2026-10-03, evening)
 - Code: T1â€“T15 done; later work was squash-merged to `main` (6d9c977).
