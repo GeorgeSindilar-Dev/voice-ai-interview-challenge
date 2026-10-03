@@ -8,6 +8,16 @@ public sealed partial class MockIssuer
     public Task<MockResult> ResetPasswordAsync(ResetRequest request, CancellationToken ct) =>
         RunAsync(now => ResetPassword(request, now), save: true, ct);
 
+    /// <summary>The work account sign-in: true only for the user's current password (the new one after a reset).</summary>
+    public Task<bool> CheckPasswordAsync(string username, string password, CancellationToken ct) =>
+        RunAsync(_ =>
+        {
+            var user = FindUser(username);
+            var current = user is null ? "" : _state.PasswordHashes.GetValueOrDefault(Normalize(user.Username)) ?? Hash(user.InitialPassword);
+            // Always one constant-time comparison, so an unknown username looks like a wrong password.
+            return SecretEquals(Hash(password), current) && user is not null;
+        }, save: false, ct);
+
     private MockResult ValidatePassword(ValidatePasswordRequest request, DateTimeOffset now)
     {
         if (FindByToken(request.Token) is not { } recovery || FindUser(recovery.Username) is not { } user)

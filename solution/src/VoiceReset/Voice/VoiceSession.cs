@@ -145,7 +145,7 @@ public sealed class VoiceSession(
                 await OnResponseDoneAsync(done.Response, ct);
                 break;
             case SessionUpdateError error:
-                VoiceLog.VoiceLiveError(logger, SessionId, error.Error?.Code);
+                VoiceLog.VoiceLiveError(logger, SessionId, error.Error?.Code, error.Error?.Param);   // the parameter name, never the message text
                 break;
         }
     }

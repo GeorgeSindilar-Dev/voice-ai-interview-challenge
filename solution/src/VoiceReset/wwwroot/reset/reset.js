@@ -134,7 +134,8 @@ async function onSubmit(event) {
         operation_id: crypto.randomUUID(), // a new operation for every attempt
       });
       if (reset.ok && reset.data?.status === 'succeeded') {
-        finish('Your password has been changed. You can close this page and return to the call.', 'success');
+        finish('Your password has been changed. Return to the call, then sign in with it.', 'success');
+        document.getElementById('login-link').hidden = false;
       } else if (reset.ok) {
         finish('The password could not be changed right now. Tell the assistant on the call.', 'error');
       } else {

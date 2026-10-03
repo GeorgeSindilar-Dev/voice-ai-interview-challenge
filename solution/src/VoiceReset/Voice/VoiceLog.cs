@@ -15,8 +15,8 @@ internal static partial class VoiceLog
     [LoggerMessage(Level = LogLevel.Warning, Message = "ResponseNotCompleted {SessionId} {Status}")]
     public static partial void ResponseNotCompleted(ILogger logger, string sessionId, string? status);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "VoiceLiveError {SessionId} {Code}")]
-    public static partial void VoiceLiveError(ILogger logger, string sessionId, string? code);
+    [LoggerMessage(Level = LogLevel.Warning, Message = "VoiceLiveError {SessionId} {Code} {Param}")]
+    public static partial void VoiceLiveError(ILogger logger, string sessionId, string? code, string? param);
 
     // Exception messages can carry service response bodies, so only the type is logged.
     [LoggerMessage(Level = LogLevel.Information, Message = "CallConnectionClosed {SessionId} {ExceptionType}")]

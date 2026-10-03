@@ -17,6 +17,9 @@ param(
     # Makes the globally unique names unique: 3-8 lowercase letters or digits.
     [Parameter(Mandatory)] [ValidatePattern('^[a-z0-9]{3,8}$')] [string] $Suffix,
     [string] $Location = 'swedencentral',
+    # Region for the App Service plan only (defaults to $Location); use it when the plan's
+    # region has no App Service quota on a new subscription.
+    [string] $AppLocation = '',
     # Checked against `az webapp list-runtimes --os linux` before the web app is created.
     [string] $Runtime = 'DOTNETCORE:10.0'
 )
@@ -117,16 +120,21 @@ foreach ($container in 'state', 'transcripts') {
 $storageId = Get-AzValue storage account show --name $storageName --resource-group $resourceGroup --query id
 
 Write-Host "AI Services account for Voice Live ($aiName)"
-Invoke-Az cognitiveservices account create --name $aiName --resource-group $resourceGroup --location $Location --kind AIServices --sku S0 --custom-domain $aiName --yes
+$aiExists = @(Get-AzLines cognitiveservices account list --resource-group $resourceGroup --query "[?name=='$aiName'].name").Count -gt 0
+if (-not $aiExists) {   # a second create fails, so only create it once
+    Invoke-Az cognitiveservices account create --name $aiName --resource-group $resourceGroup --location $Location --kind AIServices --sku S0 --custom-domain $aiName --yes
+}
 $aiId = Get-AzValue cognitiveservices account show --name $aiName --resource-group $resourceGroup --query id
 
 Write-Host "App Service plan B1 Linux ($planName) and web app ($appName)"
-Invoke-Az appservice plan create --name $planName --resource-group $resourceGroup --location $Location --sku B1 --is-linux
+$planLocation = if ($AppLocation) { $AppLocation } else { $Location }
+Invoke-Az appservice plan create --name $planName --resource-group $resourceGroup --location $planLocation --sku B1 --is-linux
 $appExists = @(Get-AzLines webapp list --resource-group $resourceGroup --query "[?name=='$appName'].name").Count -gt 0
 if (-not $appExists) {
     try { $runtimes = @(Get-AzLines webapp list-runtimes --os linux | ForEach-Object { $_ -split '\s+' }) }
     catch { $runtimes = @(); Write-Warning 'Could not list the Linux runtimes: the runtime name is not checked.' }
-    if ($runtimes.Count -gt 0 -and $runtimes -notcontains $Runtime) {
+    # list-runtimes prints 'DOTNETCORE|10.0' while webapp create takes 'DOTNETCORE:10.0'.
+    if ($runtimes.Count -gt 0 -and $runtimes -notcontains ($Runtime -replace ':', '|')) {
         throw "Runtime '$Runtime' is not offered for Linux. Available .NET runtimes: $(($runtimes | Where-Object { $_ -match 'DOTNET' }) -join ', '). Pass one with -Runtime."
     }
     Invoke-Az webapp create --name $appName --resource-group $resourceGroup --plan $planName --runtime $Runtime

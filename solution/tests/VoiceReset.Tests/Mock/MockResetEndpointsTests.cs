@@ -31,6 +31,23 @@ public sealed class MockResetEndpointsTests
     }
 
     [Fact]
+    public async Task CheckPassword_AfterReset_AcceptsOnlyTheNewPassword()
+    {
+        await using var app = new MockAppFactory();
+        using var service = app.CreateServiceClient();
+        using var browser = app.CreateClient();
+        var (_, token) = await IssueLinkAsync(app, service);
+        var initialBefore = await app.Issuer.CheckPasswordAsync(User, "Dev-only-Alex-1", Ct); // appsettings.Development.json
+
+        await ResetAsync(browser, token, StrongPassword, "reset-1");
+
+        Assert.True(initialBefore);
+        Assert.False(await app.Issuer.CheckPasswordAsync(User, "Dev-only-Alex-1", Ct));
+        Assert.True(await app.Issuer.CheckPasswordAsync(User, StrongPassword, Ct));
+        Assert.False(await app.Issuer.CheckPasswordAsync("nobody", StrongPassword, Ct));
+    }
+
+    [Fact]
     public async Task Reset_AfterTenMinutes_ReturnsLinkExpired()
     {
         await using var app = new MockAppFactory();
