@@ -11,16 +11,20 @@ phone through ACS comes later, if a number can be obtained).
   [contracts/submission.schema.json](contracts/submission.schema.json).
 - **Our code and docs live in `solution/`.** The repo is public: never commit
   secrets, tenant IDs or phone numbers.
-- **Local notes (never committed):** `.notes/` (it ignores itself).
-  - The plan we follow: [.notes/plan.md](.notes/plan.md)
+- **Working notes:** `.notes/` (committed, so local and cloud sessions share them; never put
+  secrets, tenant/subscription IDs, emails or company names there).
+  - Start here: [.notes/context.md](.notes/context.md) (owner preferences, status, Azure situation)
+  - The plan we follow: [.notes/plan.md](.notes/plan.md); task plans and the reconciliation
+    notes (real names after each task): [.notes/plans/](.notes/plans/)
+  - Remaining work: [solution/docs/remaining-work.md](solution/docs/remaining-work.md)
   - Verified Voice Live / ACS API details:
     [.notes/archive/overnight/research/sdk-reference.md](.notes/archive/overnight/research/sdk-reference.md)
   - Guardrails research:
     [.notes/archive/overnight/research/guardrails-research.md](.notes/archive/overnight/research/guardrails-research.md)
   - .NET practices:
     [.notes/archive/overnight/research/dotnet-best-practices.md](.notes/archive/overnight/research/dotnet-best-practices.md)
-- The repo is only about the agent: no notes about the hiring process, submission
-  or meetings in committed files.
+- `solution/` (code and its docs) is only about the agent: no notes about the hiring
+  process, submission or meetings there. Such planning material lives in `.notes/`.
 
 ## Design (short)
 
@@ -84,7 +88,8 @@ phone through ACS comes later, if a number can be obtained).
   requests, PR/issue comments and code comments must not mention Claude, Claude Code,
   AI assistance or co-authorship. No `Co-Authored-By` trailers and no "Generated
   with" footers. The only author is the repository owner (George Sindilar).
-- `CLAUDE.md` is a normal project file and may be committed. `.notes/` stays local.
+- `CLAUDE.md` and `.notes/` are normal project files and are committed. Never commit
+  `.claude/` (local worktrees), build output or `submission.json`.
 
 ### 3. Voice agent guardrails
 
