@@ -1,4 +1,4 @@
-# Working context (for any session, local or cloud)
+﻿# Working context (for any session, local or cloud)
 
 Facts and owner preferences that aren't obvious from the code. Read with `CLAUDE.md`.
 
@@ -15,17 +15,17 @@ Facts and owner preferences that aren't obvious from the code. Read with `CLAUDE
 - No local-run deliverable: everything is deployed to Azure.
 
 ## Status (2026-10-03, evening)
-- Code: T1–T15 done; work since then is on branch `deploy-azure` (pushed, not yet merged to `main`).
+- Code: T1â€“T15 done; later work was squash-merged to `main` (6d9c977).
   81 tests, 0 warnings. T16 docs not written yet; an unreviewed draft is in `drafts/SETUP-draft.md`.
 - Remaining work: `solution/docs/remaining-work.md`.
-- Implementation process used: superpowers subagent-driven development: implementer → spec review →
-  code-quality review → fixes, per task. Plans: `plans/` (`00-contracts.md`, `00-reconciliation.md`
+- Implementation process used: superpowers subagent-driven development: implementer â†’ spec review â†’
+  code-quality review â†’ fixes, per task. Plans: `plans/` (`00-contracts.md`, `00-reconciliation.md`
   wins over the task plans and records the real names after each task).
 - Added after deployment (on `deploy-azure`):
   - `/mock/login`: a mock work-account sign-in (Razor page `Pages/Mock/Login`). It only checks the
     password (`MockIssuer.CheckPasswordAsync`: current hash or `InitialPassword`) and shows success or
-    failure. Intended flow: try to sign in → "Forgot your password?" link to the agent page → call →
-    inbox (new tab, linked from the agent page) → reset form → "Sign in with your new password" link
+    failure. Intended flow: try to sign in â†’ "Forgot your password?" link to the agent page â†’ call â†’
+    inbox (new tab, linked from the agent page) â†’ reset form â†’ "Sign in with your new password" link
     back to `/mock/login`.
   - Prompt step 5: before `end_call` the agent asks "anything else?"; "thank you"/"okay" alone is not a
     goodbye. (In the first test the model hung up on a plain "thank you".)
@@ -40,7 +40,7 @@ Facts and owner preferences that aren't obvious from the code. Read with `CLAUDE
   (no B1 quota in eastus2/eastus on a new subscription); web app `app-voicereset-gs01`.
 - Created with `solution/scripts/setup-azure.ps1 -SubscriptionId <id> -Suffix gs01 -Location eastus2
   -AppLocation centralus` (rerunnable; secrets generated only when missing, never printed).
-- Deploy: `solution/scripts/deploy.ps1 -Suffix gs01` (clean tree → tests → publish → zip → deploy →
+- Deploy: `solution/scripts/deploy.ps1 -Suffix gs01` (clean tree â†’ tests â†’ publish â†’ zip â†’ deploy â†’
   waits for `/health` to show the commit). Manual, no CI/CD. The prompt is compiled in, so prompt and
   guardrail changes need a deploy. Voice Live model mode needs nothing created in Foundry.
 - URLs: agent `https://app-voicereset-gs01.azurewebsites.net/`, inbox `/mock/inbox/login`,
@@ -48,7 +48,7 @@ Facts and owner preferences that aren't obvious from the code. Read with `CLAUDE
 - Demo users (setup script): `alex.morgan`, `jamie.lee`, `sam.taylor` (needs unlock). Access code,
   inbox passwords and initial passwords are only in the web app settings (`Access__Code`,
   `Mock__Users__N__*`). After a reset the new password is a SHA-256 hash in blob
-  `state/mock/state.json` → `PasswordHashes`; delete that blob to reset all mock state.
+  `state/mock/state.json` â†’ `PasswordHashes`; delete that blob to reset all mock state.
 - Local Windows: prepend `C:\Program Files\Microsoft SDKs\Azure\CLI2\wbin` to PATH in PowerShell.
   Sign in with `az login --tenant <tenant>` (MFA). From a cloud session: `az login --use-device-code`.
 
@@ -70,12 +70,12 @@ Facts and owner preferences that aren't obvious from the code. Read with `CLAUDE
 ## Phone channel decision
 - ACS numbers are effectively unavailable for new tenants (Sept 2026 retirement; see sdk-reference).
   The README says the interviewer supplies sandbox telephony, but the owner chose **Twilio** (Telnyx as
-  fallback): US toll-free number, voice webhook → our app. Risk accepted: the spec wants ACS/Teams
+  fallback): US toll-free number, voice webhook â†’ our app. Risk accepted: the spec wants ACS/Teams
   telephony; document that Twilio only carries the call and everything else is Azure.
 - Owner creates the Twilio account, upgrades it (no trial message), buys the number and puts the Auth
   Token into the app settings in the portal (never in chat or the repo).
 - Code still to write: `POST /phone/twilio` returns TwiML `<Connect><Stream url="wss://.../phone/stream">`;
-  a `TwilioAudioChannel : IAudioChannel` on that WebSocket (μ-law 8 kHz; Voice Live supports
+  a `TwilioAudioChannel : IAudioChannel` on that WebSocket (Î¼-law 8 kHz; Voice Live supports
   g711_ulaw, so set the audio format per channel); validate `X-Twilio-Signature`; tests; deploy.
 
 ## Useful references
