@@ -1,0 +1,6 @@
+# The completed submission contains the phone number and endpoints: never commit it (public repo).
+submission.json
+
+# Build output
+bin/
+obj/
