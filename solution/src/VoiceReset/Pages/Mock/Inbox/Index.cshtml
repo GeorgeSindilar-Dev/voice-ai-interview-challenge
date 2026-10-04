@@ -8,17 +8,18 @@
   <meta name="referrer" content="no-referrer">
   <meta http-equiv="refresh" content="5">
   <title>Mock inbox</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/css/site.css">
 </head>
-<body>
-  <header id="inbox-header">
-    <h1>Mock inbox: <span id="inbox-user" data-testid="inbox-user">@Model.DisplayName</span></h1>
-    <form method="post" asp-page-handler="Logout" id="logout-form">
-      <button type="submit" id="logout" data-testid="logout">Sign out</button>
-    </form>
-  </header>
-  <main id="inbox">
-    <p>Synthetic messages only. This page refreshes every 5 seconds.</p>
+<body class="inbox">
+  <main id="inbox" class="wide">
+    <header id="inbox-header" class="inbox-header">
+      <h1 class="title"><span class="badge icon-mail" aria-hidden="true"></span><span>Mock inbox: <span id="inbox-user" data-testid="inbox-user">@Model.DisplayName</span></span></h1>
+      <form method="post" asp-page-handler="Logout" id="logout-form">
+        <button type="submit" id="logout" class="secondary" data-testid="logout"><span class="icon icon-log-out" aria-hidden="true"></span>Sign out</button>
+      </form>
+    </header>
+    <p class="note">Synthetic messages only. This page refreshes every 5 seconds.</p>
     @if (Model.Messages.Count == 0)
     {
       <p id="inbox-empty" data-testid="inbox-empty">No messages yet.</p>
@@ -30,12 +31,12 @@
         {
           <li id="@message.Id" data-testid="message">
             <article>
-              <h2 data-testid="message-subject">@message.Subject</h2>
+              <h2><span class="icon icon-mail" aria-hidden="true"></span><span data-testid="message-subject">@message.Subject</span></h2>
               <p><time datetime="@(message.CreatedAt.ToString("O", CultureInfo.InvariantCulture))">@(message.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss 'UTC'", CultureInfo.InvariantCulture))</time></p>
               <p data-testid="message-body">@message.Body</p>
               @if (message.Link is not null)
               {
-                <p><a href="@message.Link" target="_blank" rel="noopener noreferrer" data-testid="message-link">Open the reset form</a></p>
+                <p><a href="@message.Link" target="_blank" rel="noopener noreferrer" class="button-link" data-testid="message-link">Open the reset form<span class="icon icon-external" aria-hidden="true"></span></a></p>
               }
             </article>
           </li>

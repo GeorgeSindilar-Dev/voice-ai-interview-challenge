@@ -5,3 +5,6 @@
 *.log
 /submission.json
 /submissions/
+
+# Local worktrees and editor settings
+.claude/

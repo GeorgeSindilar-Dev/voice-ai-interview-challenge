@@ -10,25 +10,25 @@
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/css/site.css">
 </head>
-<body class="reset-page">
-  <main class="reset-card" data-testid="work-login">
-    <h1>Work account sign-in</h1>
+<body>
+  <main data-testid="work-login">
+    <h1 class="title"><span class="badge icon-briefcase" aria-hidden="true"></span>Work account sign-in</h1>
     @if (Model.Result is true)
     {
-      <div class="reset-message" data-kind="success" role="status" data-testid="login-success">Signed in: the password is correct.</div>
+      <div class="message" data-kind="success" role="status" data-testid="login-success">Signed in: the password is correct.</div>
     }
     else if (Model.Result is false)
     {
-      <div class="reset-message" data-kind="error" role="alert" data-testid="login-error">Wrong username or password.</div>
+      <div class="message" data-kind="error" role="alert" data-testid="login-error">Wrong username or password.</div>
     }
-    <form method="post" class="reset-form">
+    <form method="post">
       <label for="username">Username</label>
       <input id="username" name="Username" value="@Model.Username" autocomplete="username" required>
       <label for="password">Password</label>
       <input id="password" name="Password" type="password" autocomplete="current-password" required>
-      <button type="submit">Sign in</button>
+      <button type="submit"><span class="icon icon-log-in" aria-hidden="true"></span>Sign in</button>
     </form>
-    <p class="reset-note">Forgot your password? <a href="/">Call the password reset assistant</a>.</p>
+    <p class="note">Forgot your password? <a href="/">Call the password reset assistant</a>.</p>
   </main>
 </body>
 </html>

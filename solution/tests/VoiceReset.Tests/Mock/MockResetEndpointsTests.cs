@@ -1,4 +1,6 @@
 using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
 
 namespace VoiceReset.Tests.Mock;
 
@@ -45,6 +47,26 @@ public sealed class MockResetEndpointsTests
         Assert.False(await app.Issuer.CheckPasswordAsync(User, "Dev-only-Alex-1", Ct));
         Assert.True(await app.Issuer.CheckPasswordAsync(User, StrongPassword, Ct));
         Assert.False(await app.Issuer.CheckPasswordAsync("nobody", StrongPassword, Ct));
+    }
+
+    [Fact]
+    public async Task ResetOperation_AfterLostAnswer_ReadableOnlyWithItsTokenOrTheServiceCredential()
+    {
+        await using var app = new MockAppFactory();
+        using var service = app.CreateServiceClient();
+        using var browser = app.CreateClient();
+        var (recoveryId, token) = await IssueLinkAsync(app, service);
+        await ResetAsync(browser, token, StrongPassword, "reset-1");
+
+        var byToken = await GetOperationAsync(browser, "reset-1", $"ResetToken {token}");
+        var byService = await GetOperationAsync(service, "reset-1", authorization: null);
+        var wrongToken = await GetOperationAsync(browser, "reset-1", "ResetToken not-the-token");
+        var unknown = await GetOperationAsync(browser, "reset-2", $"ResetToken {token}");
+
+        Assert.Equal((HttpStatusCode.OK, "succeeded", recoveryId),
+            (byToken.Status, byToken.Body.GetProperty("status").GetString(), byToken.Body.GetProperty("recovery_id").GetString()));
+        Assert.Equal(HttpStatusCode.OK, byService.Status);
+        Assert.Equal((HttpStatusCode.NotFound, HttpStatusCode.NotFound), (wrongToken.Status, unknown.Status));
     }
 
     [Fact]
@@ -137,6 +159,18 @@ public sealed class MockResetEndpointsTests
         await MockAppFactory.PostAsync(service, $"/mock/v1/recoveries/{recoveryId}/reset-link", new { operation_id = "link-1" }, Ct);
         var link = (await app.Issuer.GetInboxAsync(User, Ct))[0].Link ?? "";
         return (recoveryId, Uri.UnescapeDataString(link.Split("#token=")[1]));
+    }
+
+    // authorization null: the client's own header (the service client's Bearer credential).
+    private static async Task<Reply> GetOperationAsync(HttpClient client, string operationId, string? authorization)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/mock/v1/reset-operations/{operationId}");
+        if (authorization is not null)
+        {
+            request.Headers.TryAddWithoutValidation("Authorization", authorization);
+        }
+        using var response = await client.SendAsync(request, Ct);
+        return new Reply(response.StatusCode, await response.Content.ReadFromJsonAsync<JsonElement>(Ct));
     }
 
     private static Task<Reply> ResetAsync(HttpClient browser, string token, string password, string operationId) =>

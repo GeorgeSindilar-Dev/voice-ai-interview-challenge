@@ -1,6 +1,6 @@
 # Remaining work
 
-The application is deployed to Azure (81 tests passing, 0 warnings). This list covers what is
+The application is deployed to Azure (89 tests passing, 0 warnings). This list covers what is
 still to do.
 
 ## 1. Deploy to Azure (done)
@@ -13,8 +13,11 @@ still to do.
 
 - Done: a full call reaches the agent, the greeting plays, `start_recovery` sends the code, the
   goodbye after `end_call` is spoken.
-- Fix: Voice Live rejects part of the session settings (`invalid_session_update_message`); the
-  rejected parameter is now logged (`VoiceLiveError ... <param>`). Fix it in `VoiceLiveSettings`.
+- Fixed: Voice Live rejected messages sent before the session settings
+  (`invalid_session_update_message`); caller audio now waits for them.
+- Check after the latest changes: the spoken username keeps its first letter, look-alike letters
+  are clarified, "One moment" before slow tools, the silence prompt after 30 s, a used link is
+  reported when the form opens.
 - Check after the prompt change: the agent asks "anything else?" before `end_call` and does not
   hang up on a plain "thank you".
 - Still to verify: barge-in, the safe line, the time-limit line, the full journey (code → link →
@@ -46,9 +49,14 @@ still to do.
 
 ## 6. Known limitations to document
 
-- Single instance; JSON files are last-writer-wins; the startup check runs once per start.
+- Single instance; JSON files are last-writer-wins; locks are in-process.
 - A live call is lost on a process restart (state and tickets survive).
 - Transcript masking is pattern-based (it misses some phrasings and over-masks numbers); raw
   audio and text still pass through Voice Live.
-- Agent-only captions; desktop Chrome/Edge only; no rate limit or concurrency cap on `/voice/ws`.
+- Agent-only captions; desktop Chrome/Edge only; no rate limit or concurrency cap on `/voice/ws`
+  (concurrent sessions are expected).
+- The mock: no protection against junk requests (one lock, the whole state rewritten), records kept
+  forever, resets always complete at once (never `pending`), codes and links readable in storage.
+- The issuer throttle (contract) lets someone keep blocking an account's resets.
+- Spoken sentences can't be fully enforced in model mode (the backend supplies them; the model says them).
 - A link sent before a cancel stays valid until it expires (no revoke in the contract).

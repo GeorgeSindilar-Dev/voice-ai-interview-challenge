@@ -22,6 +22,13 @@ Facts and owner preferences that aren't obvious from the code. Read with `CLAUDE
 - **Never run `dotnet dev-certs https --trust`** (it changes the Windows certificate store); the owner
   runs it if needed.
 
+## Status (2026-10-04)
+- Branch `ccr-cdb850f7-bdrj41` (from a cloud session): page design (one card design, colour, icons),
+  two audits and the tester feedback in `audit/`, and the fixes for them (commit bdfc66a, 89 tests).
+  To be squash-merged into `main`, then deployed and tested live.
+- The `invalid_session_update_message` error is solved (audio was sent before the settings).
+- Next: deploy, one full live journey (check the username letters and latency), then the Twilio number.
+
 ## Status (2026-10-03, evening)
 - Code: T1â€“T15 done; later work was squash-merged to `main` (6d9c977).
   81 tests, 0 warnings. T16 docs not written yet; an unreviewed draft is in `drafts/SETUP-draft.md`.
@@ -68,10 +75,12 @@ Facts and owner preferences that aren't obvious from the code. Read with `CLAUDE
   "union traces, exceptions | where timestamp > ago(3h) | order by timestamp desc | take 50"`.
   Useful messages: `CallStarted`, `ToolCalled <session> <tool> <status>`, `CallEnded <session> <reason>`,
   `VoiceLiveError <session> <code> <param>`.
-- **Open issue:** Voice Live answers our `session.update` with `invalid_session_update_message`. The
-  first call failed (`max_config_attempts_exceeded`); the next got one error and then worked. Find the
-  rejected parameter from the new `Param` in the logs and fix `Voice/VoiceLiveSettings.cs`
-  (suspects: Dragon HD voice, echo cancellation, semantic VAD options, max output tokens).
+- **Solved (2026-10-04):** `invalid_session_update_message` (param `type`) came from caller audio sent
+  before `session.update`; each early message counts as a failed configuration attempt, and after 5 the
+  session ends (`max_config_attempts_exceeded`). Audio now waits for the settings.
+- `az monitor app-insights query` failed with a connection reset from this laptop; querying the
+  workspace through ARM works: `az rest --method post --url "https://management.azure.com<workspace id>/api/query?api-version=2020-08-01" --body @query.json`
+  with `{"query":"AppTraces | where TimeGenerated > ago(1d) | project TimeGenerated, Message"}`.
 - First test notes: background noise is transcribed as words; testers must use a demo username
   (unknown usernames never get a code, by design).
 

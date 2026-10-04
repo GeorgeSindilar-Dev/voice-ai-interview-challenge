@@ -18,7 +18,7 @@ public static class ToolDefinitions
     public static IReadOnlyList<VoiceLiveFunctionDefinition> All { get; } =
     [
         Define(StartRecovery,
-            "Start a password reset for the username the caller spelled. Call it only after you read the username back and the caller said yes.",
+            "Start a password reset for the username the caller gave. Call it only after you read the username back and the caller said yes.",
             """{"type":"object","properties":{"username":{"type":"string","maxLength":64,"description":"The username the caller confirmed, in its written form, for example first.last."}},"required":["username"],"additionalProperties":false}"""),
         Define(SubmitCode,
             "Check the verification code the caller read from their recovery inbox. Call it only after you read the digits back and the caller said yes.",

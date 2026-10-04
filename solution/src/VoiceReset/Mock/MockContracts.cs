@@ -14,6 +14,8 @@ public sealed record ValidatePasswordRequest(string Token, string Password);
 public sealed record ValidatePasswordResponse(bool Valid, string PolicyVersion, IReadOnlyList<PolicyRule> Violations);
 public sealed record ResetRequest(string Token, string NewPassword, string OperationId);
 public sealed record ResetResponse(string OperationId, string Status, string? ResetReceipt, string? UnlockStatus, string? ReasonCode);
+public sealed record ResetOperationResponse(
+    string OperationId, string RecoveryId, string Status, string? ResetReceipt, string? UnlockStatus, string? ReasonCode);
 public sealed record CreateTicketRequest(string RecoveryId, string OperationId);
 public sealed record TicketResponse(string TicketId, string RecoveryId, string Outcome);
 public sealed record TicketOutcomeRequest(string Outcome, string? ResetReceipt, string ReasonCode, string OperationId);

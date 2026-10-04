@@ -9,7 +9,9 @@ namespace VoiceReset.Transcripts;
 public static partial class TranscriptMasker
 {
     private const int MinCodeDigits = 3;
-    private const string Digit = "(?:[0-9]+|zero|oh|one|two|three|four|five|six|seven|eight|nine)";
+    private const string TwoDigitWords =
+        "ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety";
+    private const string Digit = "(?:[0-9]+|zero|oh|one|two|three|four|five|six|seven|eight|nine|" + TwoDigitWords + ")";
     private const string Repeat = @"(?:(?:double|triple)\s+)?";
 
     public static string Mask(string text)
@@ -19,7 +21,7 @@ public static partial class TranscriptMasker
         return DigitRunPattern().Replace(masked, MaskRun);
     }
 
-    /// <summary>A run like "oh four seven, double one two" counts its digits; 3 or more → [CODE].</summary>
+    /// <summary>A run like "oh four seven, double one two" or "forty-seven eleven" counts its digits; 3 or more → [CODE].</summary>
     private static string MaskRun(Match run)
     {
         var digits = 0;
@@ -30,6 +32,7 @@ public static partial class TranscriptMasker
                 "double" => 1,   // "double one" = two digits
                 "triple" => 2,
                 _ when char.IsAsciiDigit(word[0]) => word.Length,
+                _ when TwoDigitWordPattern().IsMatch(word) => 2,   // "forty seven" counts 3: masking too much is fine
                 _ => 1,
             };
         }
@@ -39,8 +42,12 @@ public static partial class TranscriptMasker
     [GeneratedRegex(@"https?://\S+|www\.\S+", RegexOptions.IgnoreCase)]
     private static partial Regex UrlPattern();
 
-    [GeneratedRegex(@"\b(password(?:\s+is\b|'s\b|:)).*", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
+    // "password is", "password's", "password:", "password would be / will be / was", also "pass word".
+    [GeneratedRegex(@"\b(pass\s?word(?:\s+(?:is|was|would\s+be|will\s+be)\b|'s\b|:)).*", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
     private static partial Regex PasswordPattern();
+
+    [GeneratedRegex("^(?:" + TwoDigitWords + ")$")]
+    private static partial Regex TwoDigitWordPattern();
 
     [GeneratedRegex(@"\b" + Repeat + Digit + @"(?:[\s,.\-]+" + Repeat + Digit + @")*\b", RegexOptions.IgnoreCase)]
     private static partial Regex DigitRunPattern();

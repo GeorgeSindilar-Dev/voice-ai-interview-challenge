@@ -4,6 +4,7 @@
 const ENDED_MESSAGES = {
   agent_ended: 'The assistant ended the call. Thank you.',
   time_limit: 'The call reached its time limit.',
+  no_input: 'The call ended because nothing was heard. Press Start to try again.',
   call_dropped: 'The call was disconnected. Press Start to try again.',
   unavailable: 'The voice service is not available right now. Please try again later.',
 };
@@ -107,7 +108,8 @@ async function onStart() {
     }
     await context.audioWorklet.addModule('/js/audio-worklets.js');
     stream = await navigator.mediaDevices.getUserMedia({
-      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      // Voice Live already suppresses noise; doing it twice can cut the first sound of a word.
+      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: false, autoGainControl: true },
     });
 
     const capture = new AudioWorkletNode(context, 'capture');

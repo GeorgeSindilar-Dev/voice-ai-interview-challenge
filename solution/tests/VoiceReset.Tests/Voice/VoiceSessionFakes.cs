@@ -69,6 +69,7 @@ public sealed class FakeAudioChannel(CallLog log) : IAudioChannel
 
     public string Name => "browser";
     public void HangUp() => _incoming.Writer.TryComplete();
+    public void SendAudio() => _incoming.Writer.TryWrite(new byte[4800]);
     public IAsyncEnumerable<ReadOnlyMemory<byte>> ReadAudioAsync(CancellationToken ct) => _incoming.Reader.ReadAllAsync(ct);
     public Task SendAudioAsync(ReadOnlyMemory<byte> pcm16, CancellationToken ct) => log.Add("audio-out");
     public Task StopPlaybackAsync(CancellationToken ct) => log.Add("stop-playback");

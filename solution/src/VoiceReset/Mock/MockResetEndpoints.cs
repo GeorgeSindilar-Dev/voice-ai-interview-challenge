@@ -9,6 +9,9 @@ public static class MockResetEndpoints
         browser.MapGet("/policy", () => MockResult.Json(200, new PolicyResponse(PasswordPolicy.Version, PasswordPolicy.Rules)));
         browser.MapPost("/password/validate", ValidatePasswordAsync);
         browser.MapPost("/resets", ResetAsync);
+        // The service credential, or "ResetToken <token>" for the operation that token is bound to.
+        browser.MapGet("/reset-operations/{id}", (string id, HttpRequest request, MockIssuer issuer, CancellationToken ct) =>
+            issuer.GetResetOperationAsync(id, request.Headers.Authorization.ToString(), ct));
 
         var tickets = endpoints.MapGroup("/mock/v1/tickets").AddEndpointFilter(MockIssuerEndpoints.RequireServiceCredentialAsync);
         tickets.MapPost("", CreateTicketAsync);

@@ -1,3 +1,6 @@
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using VoiceReset.Mock;
 using VoiceReset.Recovery;
 
 namespace VoiceReset.Tests.Recovery;
@@ -94,6 +97,45 @@ public sealed class RecoveryWorkflowTests
 
         var session = await app.SessionAsync(id, Ct);
         Assert.Equal(("cancelled", "caller_cancelled", "agent_ended"), (session?.TicketOutcome, session?.TicketReason, session?.EndReason));
+    }
+
+    [Fact]
+    public async Task SubmitCode_EarlierAnswerLost_MovesOnAsVerified()
+    {
+        // Arrange: the issuer accepted the code, but the answer never reached the call (simulated with another key)
+        await using var app = new RecoveryAppFactory();
+        var id = await app.StartRecoveryAsync(Spoken, Ct);
+        var code = await app.InboxCodeAsync(Ct);
+        var recoveryId = (await app.SessionAsync(id, Ct))?.RecoveryId ?? "";
+        await app.Services.GetRequiredService<MockIssuer>().VerifyAsync(recoveryId, "lost-answer", new VerifyRequest(code), Ct);
+
+        // Act: the caller reads the code again; the issuer answers invalid_state (already verified)
+        var result = await app.Workflow.SubmitCodeAsync(id, code, Ct);
+
+        // Assert
+        Assert.Equal("verified", result.Status);
+        Assert.Equal(RecoveryState.Verified, await app.Workflow.GetStateAsync(id, Ct));
+    }
+
+    [Fact]
+    public async Task EndCall_LinkOutThenResetInBrowser_TicketPendingThenResolved()
+    {
+        // Arrange: the link is sent, then the caller hangs up before using it
+        await using var app = new RecoveryAppFactory();
+        var id = await app.StartRecoveryAsync(Spoken, Ct);
+        await app.Workflow.SubmitCodeAsync(id, await app.InboxCodeAsync(Ct), Ct);
+        await app.Workflow.SendResetLinkAsync(id, Ct);
+        await app.Workflow.EndCallAsync(id, "call_dropped", Ct);
+        var afterHangUp = await app.SessionAsync(id, Ct);
+
+        // Act: the caller finishes the form, then the open session check runs
+        await app.CompleteResetAsync(await app.InboxLinkAsync(Ct), Ct);
+        await app.Services.GetServices<IHostedService>().OfType<OpenSessionCheck>().Single().CheckAsync(Ct);
+
+        // Assert
+        Assert.Equal(("pending", "completion_unknown"), (afterHangUp?.TicketOutcome, afterHangUp?.TicketReason));
+        var settled = await app.SessionAsync(id, Ct);
+        Assert.Equal((RecoveryState.Completed, "resolved"), (settled?.State, settled?.TicketOutcome));
     }
 
     private static string WrongCode(string code) => code == "000000" ? "111111" : "000000";

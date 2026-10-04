@@ -12,6 +12,8 @@ public sealed partial class RecoveryWorkflow(SessionStore sessions, IssuerClient
     private const string Resolved = "resolved";
     private const string Escalated = "escalated";
     private const string Cancelled = "cancelled";
+    private const string Pending = "pending";
+    private const string CompletionUnknownReason = "completion_unknown";
     private const string RestartReason = "restart";
 
     private static readonly ToolResult s_notAllowed = new(false, "not_allowed", Phrases.NotAllowed);
@@ -79,7 +81,9 @@ public sealed partial class RecoveryWorkflow(SessionStore sessions, IssuerClient
         {
             session.VerifyKey = null;
         }
-        if (result.Outcome == IssuerOutcome.Success)
+        // invalid_state or idempotency_conflict can mean an earlier submission was accepted but its answer was lost.
+        if (result.Outcome == IssuerOutcome.Success
+            || (result.ErrorCode is "invalid_state" or "idempotency_conflict" && await IsVerifiedAsync(recoveryId, ct)))
         {
             session.State = RecoveryState.Verified;
             return new(true, "verified", Phrases.Verified);
@@ -161,8 +165,9 @@ public sealed partial class RecoveryWorkflow(SessionStore sessions, IssuerClient
     }, ct);
 
     /// <summary>
-    /// Idempotent. reason: agent_ended (cancelled/caller_cancelled), call_dropped or time_limit (cancelled/call_dropped).
-    /// The state stays open, so a restart can still reconcile a reset finished after the call.
+    /// Idempotent. reason: agent_ended (cancelled/caller_cancelled), anything else (cancelled/call_dropped).
+    /// With a link out, the caller may still finish the form: the ticket is resolved if the reset is already done,
+    /// otherwise pending/completion_unknown until ReconcileAsync settles it. The state stays open for that.
     /// </summary>
     public Task EndCallAsync(string sessionId, string reason, CancellationToken ct) => RunAsync(sessionId, async session =>
     {
@@ -172,30 +177,42 @@ public sealed partial class RecoveryWorkflow(SessionStore sessions, IssuerClient
         }
         session.EndedAt = time.GetUtcNow();
         session.EndReason = reason;
+        if (session is { State: RecoveryState.LinkSent, RecoveryId: { } recoveryId })
+        {
+            var status = await issuer.GetRecoveryAsync(recoveryId, ct);
+            if (status.Value is { Status: "completed", ResetReceipt: { } receipt } completed)
+            {
+                await CompleteAsync(session, receipt, completed.UnlockStatus, ct);
+                return true;
+            }
+            await RecordOutcomeAsync(session, Pending, CompletionUnknownReason, null, ct);
+            return true;
+        }
         if (session.IsOpen) // a final session already has its final ticket outcome
         {
-            var ticketReason = reason == AgentEndedReason ? "caller_cancelled" : "call_dropped";
-            await RecordOutcomeAsync(session, Cancelled, ticketReason, null, ct);
+            await RecordOutcomeAsync(session, Cancelled, CancelReason(reason), null, ct);
         }
         return true;
     }, ct);
 
     /// <summary>
-    /// After a restart: records a reset that completed while no call was watching, and closes sessions older than
-    /// maxCallAge as cancelled/call_dropped. Returns true when the session was settled.
+    /// For open sessions without a live call (ended, or started before noLiveCallBefore): records a reset that
+    /// completed while no call was watching, waits while a link can still be used, then closes the session as
+    /// cancelled. Returns true when the session was settled.
     /// </summary>
-    public Task<bool> ReconcileAsync(string sessionId, TimeSpan maxCallAge, CancellationToken ct) => RunAsync(sessionId, async session =>
+    public Task<bool> ReconcileAsync(string sessionId, DateTimeOffset noLiveCallBefore, CancellationToken ct) => RunAsync(sessionId, async session =>
     {
-        if (!session.IsOpen)
+        var callOver = session.EndedAt is not null || session.StartedAt < noLiveCallBefore;
+        if (!session.IsOpen || !callOver)
         {
-            return false;
+            return false; // a live call settles itself
         }
         if (session.RecoveryId is not null)
         {
             var status = await issuer.GetRecoveryAsync(session.RecoveryId, ct);
-            if (status.Outcome == IssuerOutcome.Unavailable)
+            if (status.Outcome == IssuerOutcome.Unavailable || status.Value?.Status == "link_issued")
             {
-                return false; // unknown: leave it for the next start
+                return false; // unknown, or the caller can still use the link: try again next time
             }
             if (status.Value is { Status: "completed", ResetReceipt: { } receipt } completed)
             {
@@ -203,20 +220,17 @@ public sealed partial class RecoveryWorkflow(SessionStore sessions, IssuerClient
                 return true;
             }
         }
-        if (time.GetUtcNow() - session.StartedAt < maxCallAge)
-        {
-            return false;
-        }
-        var callEnded = session.EndedAt is not null; // EndCallAsync already recorded the ticket outcome
         session.EndedAt ??= time.GetUtcNow();
         session.EndReason ??= RestartReason;
         session.State = RecoveryState.Cancelled;
-        if (!callEnded)
+        if (session.TicketOutcome != Cancelled) // EndCallAsync may have recorded it already
         {
-            await RecordOutcomeAsync(session, Cancelled, "call_dropped", null, ct); // no ticket without a recovery
+            await RecordOutcomeAsync(session, Cancelled, CancelReason(session.EndReason), null, ct); // no ticket without a recovery
         }
         return true;
     }, ct);
+
+    private static string CancelReason(string? endReason) => endReason == AgentEndedReason ? "caller_cancelled" : "call_dropped";
 
     private async Task<ToolResult> CompleteAsync(CallSession session, string receipt, string? unlockStatus, CancellationToken ct)
     {
@@ -226,6 +240,9 @@ public sealed partial class RecoveryWorkflow(SessionStore sessions, IssuerClient
         await RecordOutcomeAsync(session, Resolved, "reset_completed", receipt, ct);
         return CompletedResult(unlockStatus);
     }
+
+    private async Task<bool> IsVerifiedAsync(string recoveryId, CancellationToken ct) =>
+        (await issuer.GetRecoveryAsync(recoveryId, ct)).Value?.Status == "verified";
 
     private static ToolResult CompletedResult(string? unlockStatus) =>
         new(true, "completed", unlockStatus == "unlocked" ? Phrases.CompletedWithUnlock : Phrases.Completed);

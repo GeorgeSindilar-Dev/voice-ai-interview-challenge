@@ -12,6 +12,8 @@ public sealed class TranscriptMaskerTests
     [InlineData("my password is Summer2026!", "my password is [REDACTED]")]
     [InlineData("my password's Summer2026!", "my password's [REDACTED]")]
     [InlineData("password: hunter 2", "password: [REDACTED]")]
+    [InlineData("forty-seven, eleven, twenty", "[CODE]")]
+    [InlineData("the new pass word would be Blue-Sky-Rocket", "the new pass word would be [REDACTED]")]
     [InlineData("open https://app.example/reset/#token=abc123 now", "open [LINK] now")]
     [InlineData("I have 2 laptops", "I have 2 laptops")]
     [InlineData("Hello, I need to reset my password.", "Hello, I need to reset my password.")]

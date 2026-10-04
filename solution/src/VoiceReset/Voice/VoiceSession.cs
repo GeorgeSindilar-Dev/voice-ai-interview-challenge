@@ -6,8 +6,8 @@ namespace VoiceReset.Voice;
 
 /// <summary>
 /// One call: caller audio to Voice Live, Voice Live events (agent audio, captions, tools) back to the caller.
-/// Three loops (caller audio, Voice Live events, the time limit) end the call through Finish(); events are
-/// handled one at a time under _turnLock. Only one response is active at a time.
+/// Four loops (caller audio, Voice Live events, the time limit, silence) end the call through Finish(); events
+/// are handled one at a time under _turnLock. Only one response is active at a time.
 /// </summary>
 public sealed class VoiceSession(
     RecoveryWorkflow workflow, ToolDispatcher tools, IVoiceLiveConnection voiceLive, IAudioChannel channel,
@@ -16,12 +16,16 @@ public sealed class VoiceSession(
 {
     public const string CallDroppedReason = "call_dropped";
     public const string TimeLimitReason = "time_limit";
-    /// <summary>The "ended" reason when no call could start (store or Voice Live unreachable).</summary>
+    public const string NoInputReason = "no_input";
+    /// <summary>The "ended" reason when no call could start (store or Voice Live unreachable, settings rejected).</summary>
     public const string UnavailableReason = "unavailable";
     public const string GreetingInstruction =
-        "Greet the caller in one short sentence. Say you are the automated password reset assistant, then ask for their username.";
+        "Greet the caller in one short sentence. Say you are an automated AI assistant for password resets, then ask for their username.";
     public const string SafeLine = "Sorry, I can't help with that. I can help you reset your password.";
     public const string TimeUpGoodbye = "We've reached the time limit for this call. Please call again to continue. Goodbye.";
+    public const string StillThereLine = "Are you still there? Take your time, I'm here when you're ready.";
+    public const string NoInputGoodbye = "I haven't heard anything, so I'll end the call now. Please call again when you're ready. Goodbye.";
+    public static readonly TimeSpan SilenceLimit = TimeSpan.FromSeconds(30);
 
     private static readonly TimeSpan s_goodbyeTimeout = TimeSpan.FromSeconds(15);
     private static readonly TimeSpan s_cleanupTimeout = TimeSpan.FromSeconds(10);
@@ -29,6 +33,10 @@ public sealed class VoiceSession(
     private readonly SemaphoreSlim _turnLock = new(1, 1);
     private readonly TaskCompletionSource<string> _finished = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource _endingStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    // Voice Live rejects anything sent before session.update (invalid_session_update_message), so audio waits for it.
+    private readonly TaskCompletionSource _configured = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private DateTimeOffset _lastHeard;    // the last time the caller or the agent spoke
+    private bool _askedStillThere;        // the silence check asked once; the next silence ends the call
     private bool _greeted;
     private bool _responseActive;         // requested or being generated: one response at a time
     private bool _modelResponsePending;   // a tool output waits for the next model response
@@ -53,6 +61,7 @@ public sealed class VoiceSession(
         }
         var recorder = new TranscriptRecorder(SessionId, channel.Name, time);
         var startedAt = time.GetUtcNow();
+        _lastHeard = startedAt;
         VoiceLog.CallStarted(logger, SessionId);
 
         // The audio loop stops last: cancelling a pending WebSocket receive aborts the socket,
@@ -62,10 +71,11 @@ public sealed class VoiceSession(
         var audio = RunLoopAsync(() => PumpCallerAudioAsync(stopAudio.Token), stopAudio.Token);
         var events = RunLoopAsync(() => HandleEventsAsync(recorder, stopEvents.Token), stopEvents.Token);
         var timeLimit = RunLoopAsync(() => EnforceTimeLimitAsync(stopEvents.Token), stopEvents.Token);
+        var silence = RunLoopAsync(() => WatchSilenceAsync(stopEvents.Token), stopEvents.Token);
 
         var reason = await _finished.Task;
         await stopEvents.CancelAsync();
-        await Task.WhenAll(events, timeLimit);
+        await Task.WhenAll(events, timeLimit, silence);
         reason = _ending ?? reason;   // a hang-up during the goodbye still ends as agent_ended or time_limit
         using var cleanup = new CancellationTokenSource(s_cleanupTimeout);   // the call's token may be cancelled already
         await TryAsync(() => workflow.EndCallAsync(SessionId, reason, cleanup.Token));
@@ -90,6 +100,7 @@ public sealed class VoiceSession(
 
     private async Task PumpCallerAudioAsync(CancellationToken ct)
     {
+        await _configured.Task.WaitAsync(ct);
         await foreach (var frame in channel.ReadAudioAsync(ct))
         {
             await voiceLive.SendAudioAsync(frame, ct);
@@ -99,6 +110,7 @@ public sealed class VoiceSession(
     private async Task HandleEventsAsync(TranscriptRecorder recorder, CancellationToken ct)
     {
         await voiceLive.ConfigureAsync(VoiceLiveSettings.Build(voiceOptions, SystemPrompt.Text), ct);
+        _configured.TrySetResult();
         await foreach (var update in voiceLive.ReadUpdatesAsync(ct))
         {
             await WithTurnLockAsync(() => HandleAsync(update, recorder, ct), ct);
@@ -114,6 +126,40 @@ public sealed class VoiceSession(
         Finish(_ending ?? TimeLimitReason);
     }
 
+    // Rule: after SilenceLimit with nobody speaking, ask once whether the caller is still there;
+    // after another SilenceLimit, say goodbye. The caller may be reading the inbox or typing in the form.
+    private async Task WatchSilenceAsync(CancellationToken ct)
+    {
+        var wait = SilenceLimit;
+        while (true)
+        {
+            await Task.Delay(wait, time, ct);
+            await WithTurnLockAsync(async () => wait = await CheckSilenceAsync(ct), ct);
+        }
+    }
+
+    /// <summary>Returns how long to wait before the next check.</summary>
+    private async Task<TimeSpan> CheckSilenceAsync(CancellationToken ct)
+    {
+        var quiet = time.GetUtcNow() - _lastHeard;
+        if (_ending is not null || _responseActive)
+        {
+            return SilenceLimit;   // the agent is speaking, or the call is ending anyway
+        }
+        if (quiet < SilenceLimit)
+        {
+            return SilenceLimit - quiet;
+        }
+        if (_askedStillThere)
+        {
+            await EndWithGoodbyeAsync(NoInputReason, NoInputGoodbye, ct);
+            return SilenceLimit;
+        }
+        _askedStillThere = true;
+        await SpeakAsync(StillThereLine, ct);
+        return SilenceLimit;
+    }
+
     private async Task HandleAsync(SessionUpdate update, TranscriptRecorder recorder, CancellationToken ct)
     {
         switch (update)
@@ -123,7 +169,12 @@ public sealed class VoiceSession(
                 await RequestModelResponseAsync(GreetingInstruction, ct);
                 break;
             case SessionUpdateInputAudioBufferSpeechStarted:   // barge-in: the service cancels; we drop unheard audio
+                _lastHeard = time.GetUtcNow();
+                _askedStillThere = false;
                 await channel.StopPlaybackAsync(ct);
+                break;
+            case SessionUpdateInputAudioBufferSpeechStopped:
+                _lastHeard = time.GetUtcNow();
                 break;
             case SessionUpdateResponseCreated:   // also the answers the service starts at the end of a caller turn
                 _responseActive = true;
@@ -146,6 +197,10 @@ public sealed class VoiceSession(
                 break;
             case SessionUpdateError error:
                 VoiceLog.VoiceLiveError(logger, SessionId, error.Error?.Code, error.Error?.Param);   // the parameter name, never the message text
+                if (!_greeted)
+                {
+                    Finish(UnavailableReason);   // only session.update was sent so far: the settings were rejected
+                }
                 break;
         }
     }
@@ -171,6 +226,7 @@ public sealed class VoiceSession(
     private async Task OnResponseDoneAsync(SessionResponse response, CancellationToken ct)
     {
         _responseActive = false;
+        _lastHeard = time.GetUtcNow();   // silence is counted from the end of the agent's turn
         var wasSafeLine = _saidSafeLine;
         _saidSafeLine = false;
         if (_ending is not null)

@@ -2,6 +2,7 @@ using Azure.AI.VoiceLive;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Time.Testing;
 using VoiceReset.Recovery;
 using VoiceReset.Transcripts;
 using VoiceReset.Voice;
@@ -12,6 +13,7 @@ namespace VoiceReset.Tests.Voice;
 public sealed class VoiceSessionTests : IClassFixture<WebApplicationFactory<Program>>, IAsyncDisposable
 {
     private readonly CallLog _log = new();
+    private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 10, 1, 9, 0, 0, TimeSpan.Zero));
     private readonly FakeVoiceLiveConnection _voiceLive;
     private readonly FakeAudioChannel _caller;
     private readonly IServiceScope _scope;
@@ -28,7 +30,7 @@ public sealed class VoiceSessionTests : IClassFixture<WebApplicationFactory<Prog
             _scope.ServiceProvider.GetRequiredService<ToolDispatcher>(),
             _voiceLive, _caller, new NullTranscriptWriter(),
             new VoiceLiveOptions { Endpoint = "https://voicelive.invalid/" }, new LimitsOptions(),
-            TimeProvider.System, NullLogger<VoiceSession>.Instance);
+            _time, NullLogger<VoiceSession>.Instance);
     }
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
@@ -48,6 +50,51 @@ public sealed class VoiceSessionTests : IClassFixture<WebApplicationFactory<Prog
 
         var commands = _log.Entries.Where(e => !e.StartsWith("read:", StringComparison.Ordinal));
         Assert.Equal(["configure", $"response:{VoiceSession.GreetingInstruction}"], commands);
+    }
+
+    [Fact]
+    public async Task RunAsync_CallerAudioBeforeSettings_IsSentOnlyAfterConfigure()
+    {
+        _caller.SendAudio();   // the page streams audio as soon as the socket opens
+
+        await StartAndGreetAsync();
+        await _log.WaitUntilAsync(entries => entries.Contains("audio-in"));
+
+        Assert.True(_log.Entries.ToList().IndexOf("configure") < _log.Entries.ToList().IndexOf("audio-in"));
+    }
+
+    [Fact]
+    public async Task RunAsync_SettingsRejected_EndsTheCallAsUnavailable()
+    {
+        _run = _session.RunAsync(Ct);
+        await _log.WaitUntilAsync(entries => entries.Contains("configure"));
+
+        _voiceLive.Emit(VoiceLiveModelFactory.SessionUpdateError(
+            error: VoiceLiveModelFactory.SessionUpdateErrorDetails(code: "invalid_session_update_message")));
+        await _run.WaitAsync(TimeSpan.FromSeconds(5), Ct);
+
+        Assert.Contains($"ended:{VoiceSession.UnavailableReason}", _log.Entries);
+    }
+
+    [Fact]
+    public async Task RunAsync_Silence_AsksOnceThenSaysGoodbye()
+    {
+        // Arrange: the greeting finishes, then nobody speaks
+        await StartAndGreetAsync();
+        _voiceLive.Emit(ResponseCreated());
+        _voiceLive.Emit(ResponseDone());
+        await _voiceLive.SyncAsync();
+
+        // Act: one silence asks, a second silence says goodbye; the goodbye then finishes
+        await AdvanceUntilAsync($"say:{VoiceSession.StillThereLine}");
+        _voiceLive.Emit(ResponseDone());
+        await _voiceLive.SyncAsync();
+        await AdvanceUntilAsync($"say:{VoiceSession.NoInputGoodbye}");
+        _voiceLive.Emit(ResponseDone());
+        await _run.WaitAsync(TimeSpan.FromSeconds(5), Ct);
+
+        // Assert
+        Assert.Contains($"ended:{VoiceSession.NoInputReason}", _log.Entries);
     }
 
     [Fact]
@@ -143,6 +190,17 @@ public sealed class VoiceSessionTests : IClassFixture<WebApplicationFactory<Prog
         await _log.WaitUntilAsync(entries => entries.Contains("configure"));
         _voiceLive.Emit(VoiceLiveModelFactory.SessionUpdateSessionUpdated());
         await _log.WaitUntilAsync(_ => ResponsesRequested() > 0);
+    }
+
+    // One second at a time: the silence check sets its next timer only after it ran.
+    private async Task AdvanceUntilAsync(string entry)
+    {
+        for (var i = 0; i < 120 && !_log.Entries.Contains(entry); i++)
+        {
+            _time.Advance(TimeSpan.FromSeconds(1));
+            await Task.Delay(10, Ct);
+        }
+        Assert.Contains(entry, _log.Entries);
     }
 
     private int ResponsesRequested() => _log.Entries.Count(e => e.StartsWith("response:", StringComparison.Ordinal));

@@ -26,7 +26,10 @@ public static class VoiceLiveSettings
             },
             TurnDetection = new AzureSemanticVadTurnDetection
             {
-                RemoveFillerWords = true,   // "uh", "mm" don't interrupt the agent
+                // Spelled usernames lost their first letter in tests: keep more audio from before the speech
+                // was detected, and don't drop short sounds as fillers (a spoken "A" can look like "uh").
+                PrefixPadding = TimeSpan.FromMilliseconds(600),
+                RemoveFillerWords = false,
                 InterruptResponse = true,   // barge-in: caller speech cancels the agent's answer
                 AutoTruncate = true,        // the history keeps only what the caller actually heard
                 CreateResponse = true,      // the service answers at the end of each caller turn

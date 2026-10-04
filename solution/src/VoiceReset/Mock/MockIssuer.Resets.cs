@@ -18,6 +18,26 @@ public sealed partial class MockIssuer
             return SecretEquals(Hash(password), current) && user is not null;
         }, save: false, ct);
 
+    /// <summary>
+    /// What happened to a reset submission whose answer was lost. Allowed with the service credential, or with
+    /// "ResetToken &lt;token&gt;" for the operation that token is bound to, even after the token was used or expired.
+    /// Anything else, including an unknown operation, is 404. Resets complete at once here, so a found one succeeded.
+    /// </summary>
+    public Task<MockResult> GetResetOperationAsync(string operationId, string authorization, CancellationToken ct) =>
+        RunAsync(_ =>
+        {
+            const string TokenScheme = "ResetToken ";
+            var recovery = _state.Recoveries.Values.FirstOrDefault(r => r.ResetOperationId == operationId);
+            var allowed = SecretEquals(authorization, $"Bearer {ServiceCredential}")
+                || (authorization.StartsWith(TokenScheme, StringComparison.Ordinal)
+                    && recovery?.TokenHash is { } tokenHash
+                    && SecretEquals(Hash(authorization[TokenScheme.Length..]), tokenHash));
+            return recovery is not null && allowed
+                ? MockResult.Json(200, new ResetOperationResponse(
+                    operationId, recovery.Id, "succeeded", recovery.ResetReceipt, recovery.UnlockStatus, ReasonCode: null))
+                : MockResult.NotFound();
+        }, save: false, ct);
+
     private MockResult ValidatePassword(ValidatePasswordRequest request, DateTimeOffset now)
     {
         if (FindByToken(request.Token) is not { } recovery || FindUser(recovery.Username) is not { } user)

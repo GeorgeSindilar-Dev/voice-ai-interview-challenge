@@ -9,12 +9,14 @@
   <script type="module" src="/js/agent.js"></script>
 </head>
 <body>
-  <main>
-    <h1>Password reset assistant</h1>
+  <main class="wide">
+    <h1 class="title"><span class="badge icon-headset" aria-hidden="true"></span>Password reset assistant</h1>
     <p>Talk to the help desk's automated assistant to reset your password.
       It is an AI voice agent, not a person. Headphones give the best result.</p>
-    <p><a href="/mock/inbox/login" target="_blank">Open the recovery inbox</a> (new tab) ·
-      <a href="/mock/login">Back to sign-in</a></p>
+    <p class="links">
+      <a href="/mock/inbox/login" target="_blank"><span class="icon icon-mail" aria-hidden="true"></span>Open the recovery inbox (new tab)</a>
+      <a href="/mock/login"><span class="icon icon-log-in" aria-hidden="true"></span>Back to sign-in</a>
+    </p>
 
     <section id="access-section" data-testid="access-section" aria-labelledby="access-heading" hidden>
       <h2 id="access-heading">Access code</h2>
@@ -22,21 +24,21 @@
         <label for="access-code">Enter the access code you were given</label>
         <input id="access-code" data-testid="access-code" name="code" type="text"
                autocomplete="off" autocapitalize="off" spellcheck="false" required>
-        <button id="access-submit" data-testid="access-submit" type="submit">Continue</button>
+        <button id="access-submit" data-testid="access-submit" type="submit">Continue<span class="icon icon-arrow-right" aria-hidden="true"></span></button>
       </form>
-      <p id="access-error" data-testid="access-error" class="error" role="alert" hidden></p>
+      <p id="access-error" data-testid="access-error" class="message" data-kind="error" role="alert" hidden></p>
     </section>
 
     <section id="call-section" data-testid="call-section" aria-labelledby="call-heading" hidden>
       <h2 id="call-heading">Call</h2>
       <div class="controls">
-        <button id="start-button" data-testid="start-button" type="button">Start call</button>
-        <button id="end-button" data-testid="end-button" type="button" disabled>End call</button>
+        <button id="start-button" data-testid="start-button" type="button"><span class="icon icon-phone" aria-hidden="true"></span>Start call</button>
+        <button id="end-button" data-testid="end-button" type="button" disabled><span class="icon icon-phone-off" aria-hidden="true"></span>End call</button>
       </div>
       <p id="status" data-testid="status" class="status" role="status" aria-live="polite">Press Start and allow the microphone.</p>
       <h3>What the assistant said</h3>
       <ol id="captions" data-testid="captions" class="captions" aria-live="polite"></ol>
-      <p class="note">Never say your password out loud. You will type it privately in the reset form that the link opens.</p>
+      <p class="note warning">Never say your password out loud. You will type it privately in the reset form that the link opens.</p>
     </section>
   </main>
 </body>

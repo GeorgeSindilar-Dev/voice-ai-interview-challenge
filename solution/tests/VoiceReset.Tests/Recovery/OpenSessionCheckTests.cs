@@ -5,12 +5,12 @@ using VoiceReset.Storage;
 
 namespace VoiceReset.Tests.Recovery;
 
-public sealed class StartupCheckTests
+public sealed class OpenSessionCheckTests
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     [Fact]
-    public async Task StartupCheck_ResetCompletedWhileDown_ResolvesTicket()
+    public async Task Check_ResetCompletedWhileDown_ResolvesTicket()
     {
         // Arrange: a call sends the link, the caller resets in the browser, then the process goes away
         var store = new InMemoryJsonStore();
@@ -23,11 +23,10 @@ public sealed class StartupCheckTests
             await before.CompleteResetAsync(await before.InboxLinkAsync(Ct), Ct);
         }
 
-        // Act: "restart" = a new app on the same storage
+        // Act: "restart" = a new app on the same storage, started a moment later
         await using var after = new RecoveryAppFactory(store);
-        var check = after.Services.GetServices<IHostedService>().OfType<StartupCheck>().Single();
-        Assert.NotNull(check.ExecuteTask);
-        await check.ExecuteTask.WaitAsync(TimeSpan.FromSeconds(10), Ct);
+        after.Time.Advance(TimeSpan.FromSeconds(1));
+        await CheckAsync(after);
 
         // Assert
         var session = await after.SessionAsync(id, Ct);
@@ -37,7 +36,7 @@ public sealed class StartupCheckTests
     }
 
     [Fact]
-    public async Task StartupCheck_CallEndedByAgentLongAgo_KeepsCallerCancelledTicket()
+    public async Task Check_CallEndedByAgentAndLinkExpired_ClosesAsCallerCancelled()
     {
         // Arrange: the agent ended the call after the link was sent, then the process goes away
         var store = new InMemoryJsonStore();
@@ -50,18 +49,19 @@ public sealed class StartupCheckTests
             await before.Workflow.EndCallAsync(id, "agent_ended", Ct);
         }
 
-        // Act: the new process starts after the call limit has passed
+        // Act: the new process checks after the link has expired unused
         await using var after = new RecoveryAppFactory(store);
         after.Time.Advance(TimeSpan.FromSeconds(601));
-        var check = after.Services.GetServices<IHostedService>().OfType<StartupCheck>().Single();
-        Assert.NotNull(check.ExecuteTask);
-        await check.ExecuteTask.WaitAsync(TimeSpan.FromSeconds(10), Ct);
+        await CheckAsync(after);
 
-        // Assert: closed, but the earlier end reason and ticket outcome stay
+        // Assert: closed, with the earlier end reason
         var session = await after.SessionAsync(id, Ct);
         Assert.Equal(RecoveryState.Cancelled, session?.State);
         Assert.Equal("agent_ended", session?.EndReason);
-        Assert.Equal("cancelled", session?.TicketOutcome);
-        Assert.Equal("caller_cancelled", session?.TicketReason);
+        Assert.Equal(("cancelled", "caller_cancelled"), (session?.TicketOutcome, session?.TicketReason));
     }
+
+    // Time is advanced before Services is first used, so the check's process start time is the advanced time.
+    private static Task CheckAsync(RecoveryAppFactory app) =>
+        app.Services.GetServices<IHostedService>().OfType<OpenSessionCheck>().Single().CheckAsync(Ct);
 }

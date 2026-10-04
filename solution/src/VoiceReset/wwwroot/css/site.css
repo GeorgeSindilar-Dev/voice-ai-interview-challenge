@@ -1,57 +1,172 @@
-:root { color-scheme: light dark; font-family: system-ui, sans-serif; line-height: 1.5; }
-body { max-width: 40rem; margin: 2rem auto; padding: 0 1rem; }
-form { display: grid; gap: 0.5rem; }
-#inbox-header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
-#messages { list-style: none; padding: 0; display: grid; gap: 1rem; }
-#messages article { border: 1px solid currentColor; border-radius: 0.5rem; padding: 0.75rem 1rem; }
-[role="alert"] { font-weight: bold; }
+/* One design for all pages: a white card over a coloured band. Light theme only. */
+:root {
+  color-scheme: light;
+  --accent: #1f5fbf;
+  --accent-dark: #184c99;
+  --accent-soft: #e8f0fb;
+  --band: linear-gradient(135deg, #1f5fbf, #3d8bd9);
+  --danger: #b3261e;
+  --warning: #8a5300;
+  --text: #1b1f24;
+  --muted: #4a5260;
+  --border: #c9d0d8;
+  --page: #f4f6f8;
+  --card: #fff;
+  font-family: system-ui, sans-serif;
+  line-height: 1.5;
+  color: var(--text);
+}
+/* The mock inbox is a separate system, so it gets its own colour (teal). */
+body.inbox {
+  --accent: #0f766e;
+  --accent-dark: #0b5952;
+  --accent-soft: #e0f2f1;
+  --band: linear-gradient(135deg, #0f766e, #22a39a);
+}
 
-/* Agent page (index.html) */
-:root { --accent: #1f5fbf; --danger: #b3261e; --danger-text: var(--danger); }
-/* The End button keeps the dark red (white text); only error text gets lighter on a dark background. */
-@media (prefers-color-scheme: dark) { :root { --danger-text: #ffb4ab; } }
-#access-section label { font-weight: 600; }
-#access-section input { font: inherit; padding: 0.5rem; width: 100%; max-width: 20rem; box-sizing: border-box; }
-#access-section button, #call-section button {
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  padding: 3rem 1rem;
+  background: var(--band) top / 100% 11rem no-repeat, var(--page);
+}
+
+main {
+  max-width: 30rem;
+  margin: 0 auto;
+  padding: 1.75rem 2rem;
+  border-radius: 0.75rem;
+  background: var(--card);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 12%);
+}
+main.wide { max-width: 42rem; }
+
+h1 { margin: 0 0 0.75rem; font-size: 1.5rem; }
+h2 { margin: 1.5rem 0 0.5rem; font-size: 1.15rem; }
+h3 { margin: 1.25rem 0 0.5rem; font-size: 1rem; }
+p { margin: 0 0 0.75rem; }
+a { color: var(--accent); }
+a:hover { color: var(--accent-dark); }
+:focus-visible { outline: 3px solid #f2a900; outline-offset: 2px; }
+[hidden] { display: none !important; }
+main > :last-child, article > :last-child { margin-bottom: 0; }
+
+/* Icons: SVG files in /icons used as masks, so they take the text colour. */
+.icon-headset { --icon: url(/icons/headset.svg); }
+.icon-briefcase { --icon: url(/icons/briefcase.svg); }
+.icon-key { --icon: url(/icons/key.svg); }
+.icon-mail { --icon: url(/icons/mail.svg); }
+.icon-phone { --icon: url(/icons/phone.svg); }
+.icon-phone-off { --icon: url(/icons/phone-off.svg); }
+.icon-log-in { --icon: url(/icons/log-in.svg); }
+.icon-log-out { --icon: url(/icons/log-out.svg); }
+.icon-arrow-right { --icon: url(/icons/arrow-right.svg); }
+.icon-external { --icon: url(/icons/external.svg); }
+.icon-check { --icon: url(/icons/check.svg); }
+.icon, .badge::before, .message::before, .status::before, .warning::before {
+  content: "";
+  display: inline-block;
+  flex-shrink: 0;
+  width: 1.15em;
+  height: 1.15em;
+  vertical-align: -0.2em;
+  background: currentColor;
+  mask: var(--icon) center / contain no-repeat;
+}
+
+/* Page title with a round coloured badge */
+.title { display: flex; align-items: center; gap: 0.75rem; }
+.badge {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+}
+.badge::before { width: 1.5rem; height: 1.5rem; }
+
+/* Forms and buttons */
+form { display: grid; gap: 0.5rem; }
+label { font-weight: 600; }
+input { font: inherit; padding: 0.6rem; border: 1px solid var(--border); border-radius: 0.4rem; }
+input:focus-visible { border-color: var(--accent); }
+button, .button-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
   font: inherit;
-  justify-self: start;
   padding: 0.6rem 1.2rem;
-  margin: 0.5rem 0.5rem 0.5rem 0;
-  border: none;
+  border: 0;
   border-radius: 0.4rem;
   background: var(--accent);
   color: #fff;
+  text-decoration: none;
   cursor: pointer;
 }
-#access-section button:disabled, #call-section button:disabled { opacity: 0.5; cursor: default; }
-#access-section button:focus-visible, #access-section input:focus-visible, #call-section button:focus-visible {
-  outline: 3px solid var(--accent);
-  outline-offset: 2px;
+button:hover:not(:disabled), .button-link:hover { background: var(--accent-dark); color: #fff; }
+button:disabled { opacity: 0.5; cursor: default; }
+form button[type="submit"] { margin-top: 0.75rem; }
+form + .message { margin-top: 1rem; }
+button.secondary { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+button.secondary:hover:not(:disabled) { background: var(--accent-soft); color: var(--accent); }
+
+/* Boxes with a leading icon: messages (info by default; data-kind="error" or "success"),
+   the call status and password warnings. */
+.message, .status, .warning { display: grid; grid-template-columns: auto 1fr; column-gap: 0.6rem; align-items: start; }
+.message > *, .status > *, .warning > * { grid-column: 2; }
+.message::before, .status::before, .warning::before { margin-top: 0.15em; }
+.message {
+  --icon: url(/icons/info.svg);
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border-left: 4px solid var(--accent);
+  border-radius: 0.4rem;
+  background: var(--accent-soft);
 }
+.message:empty { display: none; }
+.message p { margin: 0; }
+.message ul { margin: 0.25rem 0 0; padding-left: 1.25rem; }
+.message[data-kind="error"] { --icon: url(/icons/alert-circle.svg); border-color: var(--danger); background: #fde8e8; color: #7a1212; }
+.message[data-kind="success"] { --icon: url(/icons/check-circle.svg); border-color: #1e7a3c; background: #e3f6e8; color: #145a2a; }
+
+.note { margin: 1rem 0; font-size: 0.9rem; color: var(--muted); }
+.warning { --icon: url(/icons/shield.svg); color: var(--warning); }
+
+/* Agent page (/) */
+.links { display: flex; gap: 1.5rem; }
+.links a { display: inline-flex; align-items: center; gap: 0.4rem; }
+#access-form, #access-error { max-width: 24rem; }
+.controls { display: flex; gap: 0.5rem; }
 #end-button { background: var(--danger); }
-.error { color: var(--danger-text); font-weight: 600; }
-.status { font-weight: 600; }
-.captions { padding-left: 1.25rem; overflow-wrap: anywhere; }
-.captions li { margin-bottom: 0.4rem; }
-.note { font-size: 0.9rem; opacity: 0.8; }
+#end-button:hover:not(:disabled) { background: #8c1d18; }
+.status {
+  --icon: url(/icons/mic.svg);
+  margin: 1rem 0 0;
+  padding: 0.6rem 0.9rem;
+  border-radius: 0.4rem;
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+  font-weight: 600;
+}
+.captions { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.5rem; overflow-wrap: anywhere; }
+.captions li { padding: 0.5rem 0.75rem; border-left: 3px solid var(--accent); border-radius: 0.4rem; background: var(--accent-soft); }
 
 /* Reset form (/reset/) */
-.reset-page { color-scheme: light; max-width: none; min-height: 100vh; margin: 0; padding: 1.5rem 1rem;
-  box-sizing: border-box; background: #f4f6f8; color: #1b1f24; }
-.reset-card { max-width: 28rem; margin: 0 auto; background: #fff; border-radius: 0.5rem; padding: 1.5rem;
-  box-shadow: 0 1px 4px rgb(0 0 0 / 15%); }
-.reset-card h1 { margin: 0 0 1rem; font-size: 1.4rem; }
-.reset-form { display: grid; gap: 0.5rem; }
-.reset-form[hidden], .reset-message:empty { display: none; }
-.reset-form ul, .reset-message ul { margin: 0.25rem 0 0.75rem; padding-left: 1.25rem; }
-.reset-form label { font-weight: 600; }
-.reset-form input { font: inherit; padding: 0.6rem; border: 1px solid #6b7380; border-radius: 0.3rem; }
-.reset-form button { font: inherit; margin-top: 0.75rem; padding: 0.7rem; border: 0; border-radius: 0.3rem;
-  background: #1f5fbf; color: #fff; cursor: pointer; }
-.reset-form button:disabled { background: #7d8da6; cursor: wait; }
-.reset-page :focus-visible { outline: 3px solid #f2a900; outline-offset: 2px; }
-.reset-message { margin-bottom: 1rem; padding: 0.75rem; border-radius: 0.3rem; background: #e8f0fb; }
-.reset-message p { margin: 0; }
-.reset-message[data-kind="error"] { background: #fde8e8; color: #7a1212; }
-.reset-message[data-kind="success"] { background: #e3f6e8; color: #145a2a; }
-.reset-note { margin: 1rem 0 0; font-size: 0.9rem; color: #4a5260; }
+.reset-form ul { margin: 0 0 0.75rem; padding-left: 1.25rem; }
+.reset-form li::marker { color: var(--accent); }
+.reset-form h2 { margin-top: 0; }
+
+/* Mock inbox (/mock/inbox) */
+.inbox-header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+.inbox-header h1 { margin: 0; }
+.inbox-header button { margin-top: 0; }
+#messages { list-style: none; padding: 0; margin: 0; display: grid; gap: 1rem; }
+#messages article { border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 0.5rem; padding: 0.75rem 1rem; }
+#messages h2 { display: flex; align-items: center; gap: 0.5rem; margin: 0 0 0.25rem; }
+#messages h2 .icon { color: var(--accent); }
+#messages time { font-size: 0.9rem; color: var(--muted); }

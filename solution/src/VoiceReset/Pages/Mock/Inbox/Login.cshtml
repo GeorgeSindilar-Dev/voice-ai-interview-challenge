@@ -7,22 +7,23 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
   <title>Mock inbox – sign in</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/css/site.css">
 </head>
-<body>
+<body class="inbox">
   <main id="inbox-login" data-testid="inbox-login">
-    <h1>Mock recovery inbox</h1>
-    <p>Synthetic test inbox. Sign in with your test user's inbox password.</p>
+    <h1 class="title"><span class="badge icon-mail" aria-hidden="true"></span>Mock recovery inbox</h1>
+    <p class="note">Synthetic test inbox. Sign in with your test user's inbox password.</p>
     @if (Model.Failed)
     {
-      <p id="login-error" data-testid="login-error" role="alert">Wrong username or inbox password.</p>
+      <p id="login-error" data-testid="login-error" class="message" data-kind="error" role="alert">Wrong username or inbox password.</p>
     }
     <form method="post" id="login-form" data-testid="login-form">
       <label for="username">Username</label>
       <input id="username" name="Username" value="@Model.Username" autocomplete="username" required data-testid="username">
       <label for="password">Inbox password</label>
       <input id="password" name="Password" type="password" autocomplete="current-password" required data-testid="password">
-      <button type="submit" id="login-submit" data-testid="login-submit">Sign in</button>
+      <button type="submit" id="login-submit" data-testid="login-submit"><span class="icon icon-log-in" aria-hidden="true"></span>Sign in</button>
     </form>
   </main>
 </body>

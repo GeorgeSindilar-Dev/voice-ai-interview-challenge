@@ -4,7 +4,7 @@ namespace VoiceReset.Recovery;
 public static class Phrases
 {
     public const string CodeSent = "If that account is enrolled, a verification code has been sent to its recovery inbox. It's valid for two minutes.";
-    public const string UsernameUnclear = "I didn't catch a valid username. Please spell it out, for example: first name dot last name.";
+    public const string UsernameUnclear = "I didn't catch a valid username. Please say it again, for example: first name dot last name.";
     public const string CantStartNow = "I can't start a reset for that username right now. Please try again in a few minutes.";
     public const string CodeUnclear = "I need all six digits of the code. Please read the whole code again.";
     public const string Verified = "Thanks, the code is verified. I can now send a password reset link to the same recovery inbox.";

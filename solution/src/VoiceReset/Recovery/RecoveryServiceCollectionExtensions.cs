@@ -10,7 +10,7 @@ public static class RecoveryServiceCollectionExtensions
     private static readonly TimeSpan s_issuerTimeout = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan s_connectionLifetime = TimeSpan.FromMinutes(5);
 
-    /// <summary>Registers the issuer client, the session store, the recovery workflow, the call limits and the startup check.</summary>
+    /// <summary>Registers the issuer client, the session store, the recovery workflow, the call limits and the open session check.</summary>
     public static IServiceCollection AddRecovery(this IServiceCollection services)
     {
         services.AddOptions<IssuerOptions>()
@@ -30,7 +30,7 @@ public static class RecoveryServiceCollectionExtensions
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<SessionStore>();
         services.AddSingleton<RecoveryWorkflow>();
-        services.AddHostedService<StartupCheck>();
+        services.AddHostedService<OpenSessionCheck>();
         return services;
     }
 

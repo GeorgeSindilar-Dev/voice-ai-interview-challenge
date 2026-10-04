@@ -118,6 +118,20 @@ foreach ($container in 'state', 'transcripts') {
     Invoke-Az storage container-rm create --storage-account $storageName --resource-group $resourceGroup --name $container
 }
 $storageId = Get-AzValue storage account show --name $storageName --resource-group $resourceGroup --query id
+# Transcripts are only a debugging aid: they are deleted 7 days after they were written.
+$policyFile = Join-Path ([IO.Path]::GetTempPath()) 'voicereset-lifecycle.json'
+$policy = @{ rules = @(@{
+            enabled    = $true
+            name       = 'delete-old-transcripts'
+            type       = 'Lifecycle'
+            definition = @{
+                actions = @{ baseBlob = @{ delete = @{ daysAfterModificationGreaterThan = 7 } } }
+                filters = @{ blobTypes = @('blockBlob'); prefixMatch = @('transcripts/') }
+            }
+        }) }
+$policy | ConvertTo-Json -Depth 10 | Set-Content -Path $policyFile -Encoding ascii
+Invoke-Az storage account management-policy create --account-name $storageName --resource-group $resourceGroup --policy "@$policyFile"
+Remove-Item $policyFile
 
 Write-Host "AI Services account for Voice Live ($aiName)"
 $aiExists = @(Get-AzLines cognitiveservices account list --resource-group $resourceGroup --query "[?name=='$aiName'].name").Count -gt 0
