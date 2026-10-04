@@ -1,13 +1,14 @@
 using Microsoft.AspNetCore.HttpOverrides;
-using VoiceReset.Access;
-using VoiceReset.Health;
-using VoiceReset.Http;
-using VoiceReset.Mock;
-using VoiceReset.Observability;
-using VoiceReset.Recovery;
-using VoiceReset.Storage;
-using VoiceReset.Transcripts;
-using VoiceReset.Voice;
+using VoiceReset.Features.Access;
+using VoiceReset.Features.Health;
+using VoiceReset.Features.Mock;
+using VoiceReset.Features.Phone;
+using VoiceReset.Features.Recovery;
+using VoiceReset.Features.Transcripts;
+using VoiceReset.Features.Voice;
+using VoiceReset.Shared.Http;
+using VoiceReset.Shared.Observability;
+using VoiceReset.Shared.Storage;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -27,6 +28,7 @@ builder.Services.AddAuthentication().AddCookie(MockInboxAuth.Scheme, MockInboxAu
 builder.Services.AddAuthorization();
 builder.Services.AddAccessGate(builder.Configuration);
 builder.Services.AddVoice(builder.Configuration);
+builder.Services.AddPhone();
 
 if (!builder.Environment.IsDevelopment())
 {
@@ -66,6 +68,7 @@ app.MapAccess();
 app.MapMockIssuer();
 app.MapMockReset();
 app.MapVoice();
+app.MapPhone();
 app.MapRazorPages();
 
 await app.Services.GetRequiredService<MockIssuer>().LoadAsync(app.Lifetime.ApplicationStopping);

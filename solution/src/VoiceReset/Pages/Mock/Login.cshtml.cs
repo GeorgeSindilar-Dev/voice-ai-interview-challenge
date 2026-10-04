@@ -1,6 +1,6 @@
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using VoiceReset.Mock;
+using Microsoft.AspNetCore.Mvc;
+using VoiceReset.Features.Mock;
 
 namespace VoiceReset.Pages.Mock;
 

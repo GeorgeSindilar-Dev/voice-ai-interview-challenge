@@ -155,6 +155,7 @@ button.secondary:hover:not(:disabled) { background: var(--accent-soft); color: v
 }
 .captions { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.5rem; overflow-wrap: anywhere; }
 .captions li { padding: 0.5rem 0.75rem; border-left: 3px solid var(--accent); border-radius: 0.4rem; background: var(--accent-soft); }
+.captions li.caller { border-left-color: var(--muted); background: var(--page); }
 
 /* Reset form (/reset/) */
 .reset-form ul { margin: 0 0 0.75rem; padding-left: 1.25rem; }

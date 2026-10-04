@@ -21,3 +21,20 @@ never asks for the password; ends the call on "goodbye".
 - One call on laptop speakers without headphones (echo check). Manual, by the owner.
 - Reset `alex.morgan` to its initial password: remove its entry from `PasswordHashes` in blob
   `state/mock/state.json` (deleting the whole blob resets all mock state). Do it last.
+
+## Probe: is the first word lost by Voice Live or by the browser? (2026-10-04)
+
+A local probe sent recorded speech (Windows TTS, 24 kHz PCM, real-time pace, 1.5 s silence first)
+straight to Voice Live with our settings and read the transcription:
+
+| Settings | "Alex dot Morgan" | "A. L. E. X." | "V. O. I. C. A. dot Razvan" |
+|---|---|---|---|
+| current (600 ms padding, echo cancellation, noise suppression) | alex.morgan | ALEX | VOICA.rasvin |
+| without echo cancellation / noise suppression | same | same | same |
+| 300 ms padding | alex.morgan | **LEX** | Voica.rasvin |
+| 1000 ms padding | alex.morgan | Alex | VOICA dot Rasvin |
+
+With clean audio Voice Live keeps the first letter at 600 ms or more (300 ms loses it). A live call
+after the 600 ms change still lost "Alex" ("dot Morgan"), so the rest of the loss likely comes from
+the browser path (its audio processing, or how quietly the first word starts). Options: 1000 ms
+padding, browser auto gain control off. The phone path skips the browser processing.

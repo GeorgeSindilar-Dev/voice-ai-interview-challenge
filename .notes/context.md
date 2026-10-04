@@ -1,4 +1,4 @@
-﻿# Working context (for any session, local or cloud)
+# Working context (for any session, local or cloud)
 
 Facts and owner preferences that aren't obvious from the code. Read with `CLAUDE.md`.
 
@@ -9,9 +9,11 @@ Facts and owner preferences that aren't obvious from the code. Read with `CLAUDE
 - **Keep it simple.** Smallest design that works; the owner must be able to explain every line.
 - **Desktop only.** Pages target desktop Chrome/Edge. No mobile/responsive work, checks or review findings.
 - **Never name the interviewer** in files, code or commits; write "the interviewer".
-- **Structure (agreed for the cleanup pass):** features stay as top-level folders; everything that is
-  not a feature (`Http/`, `Observability/`, `Storage/`, possibly `Health/`) moves into one `Shared/`
-  folder. Also remove unused code. Done after the app works end to end.
+- **Structure (done 2026-10-04):** features (endpoints and behaviour, including `Health`) live under
+  `src/VoiceReset/Features/`, non-feature code (`Http`, `Observability`, `Storage`) under `Shared/`;
+  namespaces match (`VoiceReset.Features.Voice`, `VoiceReset.Shared.Storage`); tests mirror it.
+  Razor pages stay in `Pages/` (framework convention). Owner kept the existing interfaces and DI as
+  they are (no generic phone or voice provider abstraction). Still open: a dead-code pass.
 - No local-run deliverable: everything is deployed to Azure.
 - **Ask before acting.** "Can you…?" or "what will you…?" is a question, not approval: answer only.
   Run commands, Azure changes, deploys or pushes only after an explicit go. Keep replies very short.
@@ -89,11 +91,16 @@ Facts and owner preferences that aren't obvious from the code. Read with `CLAUDE
   The README says the interviewer supplies sandbox telephony, but the owner chose **Twilio** (Telnyx as
   fallback): US toll-free number, voice webhook â†’ our app. Risk accepted: the spec wants ACS/Teams
   telephony; document that Twilio only carries the call and everything else is Azure.
-- Owner creates the Twilio account, upgrades it (no trial message), buys the number and puts the Auth
-  Token into the app settings in the portal (never in chat or the repo).
-- Code still to write: `POST /phone/twilio` returns TwiML `<Connect><Stream url="wss://.../phone/stream">`;
-  a `TwilioAudioChannel : IAudioChannel` on that WebSocket (Î¼-law 8 kHz; Voice Live supports
-  g711_ulaw, so set the audio format per channel); validate `X-Twilio-Signature`; tests; deploy.
+- Two numbers (owner decision, 2026-10-04): a **US local number** for the owner's own tests from
+  Romania (US toll-free numbers usually can't be called from abroad), and a **US toll-free number**
+  for the submission. Both use the same webhook. To test the toll-free route from Romania, point the
+  local number at a TwiML Bin `<Response><Dial>+1800…</Dial></Response>`.
+- Trial first: only verified caller IDs can call, a trial message plays first ("press any key").
+  Upgrade (about $20) before handing in.
+- Owner puts the Auth Token into the app setting `Phone__Twilio__AuthToken` in the portal (never in
+  chat or the repo), and sets the number's webhook to `https://<app>/phone/incoming` (HTTP POST).
+- Code written (`Features/Phone/`): signed webhook → TwiML stream with a one-time token → `TwilioAudioChannel`
+  (μ-law 8 kHz straight to Voice Live; a local probe confirmed transcription at 8 kHz).
 
 ## Useful references
 - Verified Voice Live 1.2.0 / ACS facts: `archive/overnight/research/sdk-reference.md`.

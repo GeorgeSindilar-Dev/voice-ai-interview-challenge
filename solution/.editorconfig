@@ -61,6 +61,10 @@ dotnet_naming_style.s_camel_case.required_prefix = s_
 dotnet_naming_style.underscore_camel_case.capitalization = camel_case
 dotnet_naming_style.underscore_camel_case.required_prefix = _
 
+# The "Shared" folder (non-feature code) is a Visual Basic keyword. The rule protects libraries used
+# from VB; this is an application, so it does not apply.
+dotnet_diagnostic.CA1716.severity = none
+
 # Tests: Method_Scenario_Expected names use underscores
 [tests/**.cs]
 dotnet_diagnostic.CA1707.severity = none

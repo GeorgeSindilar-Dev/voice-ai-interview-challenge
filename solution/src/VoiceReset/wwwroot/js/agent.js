@@ -108,8 +108,9 @@ async function onStart() {
     }
     await context.audioWorklet.addModule('/js/audio-worklets.js');
     stream = await navigator.mediaDevices.getUserMedia({
-      // Voice Live already suppresses noise; doing it twice can cut the first sound of a word.
-      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: false, autoGainControl: true },
+      // Voice Live already suppresses noise; doing it twice, or a gain control that is still adjusting,
+      // can cut the first sound of a word.
+      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: false, autoGainControl: false },
     });
 
     const capture = new AudioWorkletNode(context, 'capture');
@@ -183,8 +184,12 @@ function onSocketMessage(data) {
   if (message.type === 'clear') {
     call.player.port.postMessage(null); // barge-in: drop audio the caller has not heard yet
   } else if (message.type === 'caption') {
+    const caller = message.speaker === 'caller';
     const item = document.createElement('li');
-    item.textContent = String(message.text);
+    item.className = caller ? 'caller' : 'agent';
+    const speaker = document.createElement('strong');
+    speaker.textContent = caller ? 'You: ' : 'Assistant: ';
+    item.append(speaker, String(message.text));
     byId('captions').append(item);
   } else if (message.type === 'ended') {
     call.endedReason = String(message.reason);

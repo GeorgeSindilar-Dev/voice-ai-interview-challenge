@@ -8,7 +8,9 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)] [ValidatePattern('^[a-z0-9]{3,8}$')] [string] $Suffix,
-    [int] $TimeoutMinutes = 5
+    [int] $TimeoutMinutes = 5,
+    # Only for a quick live check; run the tests and deploy again afterwards.
+    [switch] $SkipTests
 )
 
 $ErrorActionPreference = 'Stop'
@@ -44,9 +46,14 @@ try {
     $commit = ("$(git rev-parse HEAD)").Trim()
     Assert-Success 'git rev-parse'
 
-    Write-Host '2/6 Running the tests'
-    dotnet test --project tests/VoiceReset.Tests -c Release
-    Assert-Success 'dotnet test'
+    if ($SkipTests) {
+        Write-Host '2/6 Skipping the tests (-SkipTests)'
+    }
+    else {
+        Write-Host '2/6 Running the tests'
+        dotnet test --project tests/VoiceReset.Tests -c Release
+        Assert-Success 'dotnet test'
+    }
 
     Write-Host '3/6 Publishing'
     dotnet publish src/VoiceReset -c Release -o (Join-Path $work 'publish')

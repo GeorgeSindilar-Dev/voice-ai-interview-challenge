@@ -7,3 +7,6 @@ obj/
 
 # Test output
 TestResults/
+
+# Visual Studio local files
+.vs/

@@ -162,6 +162,8 @@ async function onSubmit(event) {
         finish(PENDING, 'info');
       } else if (reset.ok) {
         finish('The password could not be changed right now. Tell the assistant on the call.', 'error');
+      } else if (reset.data?.error?.code === undefined) {
+        await checkOperation(operationId); // a server error: the password may already have changed
       } else {
         handleFailure(reset);
       }

@@ -25,26 +25,34 @@ still to do.
   paths (wrong code twice, expired code, human, cancel, closing the tab), masked transcripts, a clean
   browser console.
 
-## 3. Documentation
+## 3. Documentation (written)
 
-- `docs/SETUP.md`: prerequisites, build/test, local run, Azure setup and deploy, configuration
-  names (no values), how to use the three pages, trust boundaries, known limitations, cleanup.
-- `docs/architecture.md`: components, call flow, state machine, guardrails as implemented,
-  decisions and trade-offs.
+- `docs/SETUP.md`: pages and URLs, prerequisites, build/test, local run, Azure setup and deploy
+  (script parameters and resources), configuration names (no values), trying the journey, isolated
+  test deployment and restart tests, operations (logs, transcripts, resetting mock state), trust
+  boundaries, what the mock issuer implements (rate limits, retention, what is not implemented),
+  known limitations, cleanup.
+- `docs/architecture.md`: components (diagram and table), call flow (sequence diagram) and call
+  endings, recovery state machine and ticket outcomes, guardrails as implemented (code or prompt),
+  reliability (idempotency keys, reconciliation, restarts), data and secrets, the planned phone
+  channel, decisions and trade-offs, cost drivers, changes before production.
+- Updated for the phone channel; update again after the live phone test.
 
 ## 4. Phone channel
 
 - New ACS tenants can't get phone numbers since the September 2026 retirement announcement, so the
   number comes from Twilio (US toll-free), which only carries the call; speech, model and tools stay
   on Azure Voice Live.
-- Add `POST /phone/twilio` (returns TwiML that connects a media stream) and a Twilio media-stream
-  WebSocket as a second `IAudioChannel` feeding the same voice session (μ-law 8 kHz, which Voice
-  Live accepts). Validate the `X-Twilio-Signature` header. The Auth Token goes in app settings.
+- Built: `POST /phone/incoming` (signature check, TwiML with a one-time token) and `/phone/stream`
+  (`TwilioAudioChannel`, μ-law 8 kHz straight to Voice Live). Setup steps are in `SETUP.md`.
+- Live: a US local number (tests from abroad) and a US toll-free number both point at `/phone/incoming`.
+  A call to the local number worked end to end (greeting, speech, goodbye played, hang-up).
+- Still to do: one call to the toll-free number from the US (Twilio blocks forwarding to it from the
+  account, error 13225), and a full reset journey on the phone.
 
 ## 5. Code cleanup
 
-- Move non-feature folders (`Http/`, `Observability/`, `Storage/`, possibly `Health/`) into one
-  `Shared/` folder; keep only features at the top level.
+- Done: features under `Features/` (including `Health`), non-feature code under `Shared/`.
 - Remove unused code (dead-code pass).
 
 ## 6. Known limitations to document
@@ -53,7 +61,7 @@ still to do.
 - A live call is lost on a process restart (state and tickets survive).
 - Transcript masking is pattern-based (it misses some phrasings and over-masks numbers); raw
   audio and text still pass through Voice Live.
-- Agent-only captions; desktop Chrome/Edge only; no rate limit or concurrency cap on `/voice/ws`
+- Captions show both sides (the caller's with a spoken password masked); desktop Chrome/Edge only; no rate limit or concurrency cap on `/voice/ws`
   (concurrent sessions are expected).
 - The mock: no protection against junk requests (one lock, the whole state rewritten), records kept
   forever, resets always complete at once (never `pending`), codes and links readable in storage.
