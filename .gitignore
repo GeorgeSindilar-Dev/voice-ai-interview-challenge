@@ -8,3 +8,7 @@
 
 # Local worktrees and editor settings
 .claude/
+
+# Working notes and agent instructions, kept locally (not part of the solution)
+/.notes/
+/CLAUDE.md
