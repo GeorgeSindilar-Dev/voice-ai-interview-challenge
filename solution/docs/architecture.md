@@ -273,6 +273,27 @@ sequenceDiagram
   has played everything before it, then closes the stream, and Twilio hangs up.
 - The caller's number is never used or logged: caller ID is not proof of identity.
 
+## Code conventions
+
+- **Simplest design that does the job.** No speculative features or layers; every line should
+  be explainable.
+- **Folders by feature** (`Features/Voice`, `Features/Recovery`, `Features/Phone`, ...); code
+  that is not a feature lives in `Shared/`. `Program.cs` only wires things up.
+- **Minimal APIs per feature**, handlers as named methods in small static endpoint classes.
+  Options classes are validated at startup; business code never reads configuration.
+- **Interfaces only at real boundaries:** `IJsonStore`, `ITranscriptWriter`, `IAudioChannel`,
+  `IVoiceLiveConnection`, `ITelephonyProvider`. Tests use small hand-written fakes, no mocking
+  library.
+- **Expected failures are return values** (`ToolResult`, `IssuerResult`, `MockResult`);
+  exceptions are for bugs and infrastructure faults.
+- **Async with `CancellationToken` everywhere; `TimeProvider`** wherever time matters (code and
+  link expiry, timers), so tests run on a fake clock.
+- **Structured logs** (`[LoggerMessage]`) with IDs, states and status codes only.
+- Nullable reference types on, warnings are errors in Release, classes `sealed` by default,
+  records for immutable data. Pages are static HTML with small vanilla JavaScript; server
+  text is inserted with `textContent` only.
+- **Tests:** xUnit, names like `SubmitCode_SecondWrongCode_EscalatesAsExhausted`, deterministic.
+
 ## Decisions and trade-offs
 
 | Decision | Why | Cost |
