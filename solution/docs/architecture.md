@@ -12,12 +12,15 @@ How to deploy and run it, and the known limitations, are in [SETUP.md](SETUP.md)
 
 ```mermaid
 flowchart LR
+  PH["Caller's phone"]
+  TW["Twilio: US number, media stream"]
   subgraph Browser["Caller's browser"]
     AP["Agent page /"]
     IN["Recovery inbox /mock/inbox"]
     RF["Reset form /reset/"]
   end
   subgraph App["App Service: one ASP.NET Core app"]
+    PE["Phone endpoints /phone/incoming, /phone/stream (ITelephonyProvider)"]
     VS["VoiceSession, one per call"]
     TD["ToolDispatcher"]
     RW["RecoveryWorkflow, the state machine"]
@@ -29,7 +32,9 @@ flowchart LR
   ST[("Blob Storage: state, transcripts")]
   AI["Application Insights"]
 
-  AP -- "audio over WebSocket /voice/ws" --> VS
+  PH -- "phone call" --> TW
+  TW -- "signed webhook, then audio over WebSocket (μ-law 8 kHz)" --> PE --> VS
+  AP -- "audio over WebSocket /voice/ws (PCM 24 kHz)" --> VS
   VS <--> VL
   VS --> TD --> RW --> IC
   IC -- "HTTPS, service credential" --> MI
@@ -66,8 +71,9 @@ flowchart LR
 
 ## Call flow
 
-The normal journey. Each tool call goes VoiceSession → ToolDispatcher → RecoveryWorkflow,
-and its result (`ok`, `status`, `say`) goes back to the model.
+The normal journey, the same for a phone and a browser caller (see [Phone channel](#phone-channel)
+for how a phone call reaches the session). Each tool call goes VoiceSession → ToolDispatcher →
+RecoveryWorkflow, and its result (`ok`, `status`, `say`) goes back to the model.
 
 ```mermaid
 sequenceDiagram
@@ -77,7 +83,7 @@ sequenceDiagram
   participant S as VoiceSession and workflow
   participant I as Mock issuer
   participant X as Inbox and reset form
-  C->>S: access code, then WebSocket /voice/ws
+  C->>S: phone call via Twilio (/phone/incoming, /phone/stream), or browser: access code, then /voice/ws
   S->>V: session settings, then caller audio
   V-->>C: greeting, says it is an automated AI assistant
   C->>V: username, confirms the read-back
