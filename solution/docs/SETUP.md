@@ -12,19 +12,21 @@ One ASP.NET Core app (.NET 10) on Azure App Service. It holds the voice agent an
 `/mock/...`, small mock versions of the issuer, the ticket system and the recovery inbox.
 Speech and the model are Azure Voice Live. State is JSON in Blob Storage.
 
-| Page | URL | Who uses it |
+Callers reach the agent by **phone**: a Twilio number streams the call to the app (see
+[Connect a phone number](#3-connect-a-phone-number-twilio)). The browser agent page is a
+second way in, to talk to the same agent without a phone.
+
+| Entry | URL | Who uses it |
 |---|---|---|
-| Agent page | `/` | The caller: enters the access code, then talks to the agent |
+| Phone number | the Twilio number (webhook `/phone/incoming`) | The caller: calls the agent |
+| Agent page | `/` | Optional: talk to the agent in the browser after entering the access code |
 | Recovery inbox | `/mock/inbox/login` | The caller, signed in as the synthetic user: reads the code and the reset link |
 | Reset form | `/reset/` (opened from the link) | The caller: types the new password |
 | Work sign-in | `/mock/login` | Optional: checks the old or new password ("Forgot your password?" links to `/`) |
 | Health | `/health` | Anyone: `{"status":"ok","commit":"<sha>"}` |
 
-Pages target desktop Chrome or Edge with a microphone. HTTPS is required everywhere, also
-locally (the cookies are `__Host-` and `Secure`).
-
-Phone callers reach the same agent through a Twilio number; see
-[Connect a phone number](#3-connect-a-phone-number-twilio).
+Pages target desktop Chrome or Edge (the agent page also needs a microphone). HTTPS is
+required everywhere, also locally (the cookies are `__Host-` and `Secure`).
 
 ## Prerequisites
 
@@ -33,6 +35,8 @@ Phone callers reach the same agent through a Twilio number; see
 - For Azure: a subscription where your account is **Owner** (or Contributor plus User
   Access Administrator). The setup script registers resource providers, creates a resource
   group and creates role assignments.
+- For the phone: an upgraded Twilio account with a US voice number (see
+  [Connect a phone number](#3-connect-a-phone-number-twilio)).
 
 ## Build and test
 
@@ -65,8 +69,9 @@ dotnet run --project src/VoiceReset
 Open `https://localhost:7180/`. Locally:
 
 - `appsettings.Development.json` holds development-only values (access code, service
-  credential, three synthetic users with inbox and initial passwords). They are never used
-  in Azure.
+  credential, three synthetic users with inbox and initial passwords, a placeholder Twilio
+  token). They are never used in Azure. Twilio can't reach `localhost`, so the phone is
+  tried on the Azure deployment.
 - `Storage:BlobEndpoint` is empty, so state is kept in memory and transcripts are not
   saved. A restart starts clean. To keep state across restarts, see
   [Isolated test deployment](#isolated-test-deployment-and-restart-tests).
@@ -170,7 +175,7 @@ of failing on the first call. Business code never reads configuration directly.
 | `Mock__Users__<i>__Username`, `__DisplayName`, `__RequiresUnlock` | Synthetic accounts | script |
 | `Mock__Users__<i>__InboxPassword`, `__InitialPassword` | Inbox sign-in and starting password | script, secret |
 | `Limits__MaxCallSeconds` | Maximum call length (default 600, allowed 60 to 3600) | default in code |
-| `Phone__Twilio__AuthToken` | The Twilio account's Auth Token; it checks webhook signatures. Empty means the phone routes answer 404 | owner, in the portal, secret |
+| `Phone__Twilio__AuthToken` | The Twilio account's Auth Token; it checks webhook signatures (and looks up unsigned trial calls). Empty means the phone routes answer 404 | owner, in the portal, secret |
 | `APPLICATIONINSIGHTS_CONNECTION_STRING` | Telemetry export; nothing is exported when unset | script |
 
 The synthetic users are `alex.morgan`, `jamie.lee` and `sam.taylor` (the last one also
@@ -182,10 +187,11 @@ az webapp config appsettings list -g rg-voicereset -n app-voicereset-<suffix> --
 
 ## Trying the journey
 
-1. **Agent page `/`:** enter the access code, press **Start call** and allow the
-   microphone. The agent says it is an automated AI assistant and asks for the username.
-   Say it the normal way ("alex dot morgan"); the agent reads it back and waits for "yes".
-2. **Recovery inbox:** open `/mock/inbox/login` in another tab (the agent page links to it)
+1. **Call the phone number** (or, in a browser, open the agent page `/`, enter the access
+   code, press **Start call** and allow the microphone). The agent says it is an automated
+   AI assistant and asks for the username. Say it the normal way ("alex dot morgan"); the
+   agent reads it back, spells it and waits for "yes".
+2. **Recovery inbox:** open `/mock/inbox/login` in a browser (the agent page links to it)
    and sign in with the same username and its inbox password. A six-digit code arrives,
    valid for two minutes. Read it to the agent and confirm the read-back. Two wrong codes
    lock this reset attempt and record an escalation.
@@ -198,7 +204,7 @@ az webapp config appsettings list -g rg-voicereset -n app-voicereset-<suffix> --
 
 Other paths to try: an unknown username (same words, no code arrives), a wrong code twice,
 waiting more than two minutes, "can I talk to a person?", "cancel", silence (after 30 s
-"Are you still there?", after 60 s more a goodbye), and closing the tab mid-call.
+"Are you still there?", after 60 s more a goodbye), and hanging up mid-call.
 
 ## Isolated test deployment and restart tests
 
@@ -221,20 +227,21 @@ What to expect after a restart:
 
 - Issuer state survives: code windows, attempt counts, throttles, links, receipts and
   tickets. A restart can't reset or extend a code window or its two attempts.
-- A call that was live is lost: the page says the connection was lost. The caller
-  starts a new call; the account stays throttled until the old code window (or a link
+- A call that was live is lost: the page says the connection was lost, and a phone call
+  drops. The caller starts a new call; the account stays throttled until the old code window (or a link
   already sent) expires.
 - The open-session check runs at startup and then every minute. For each session with no
   live call it asks the issuer: a reset that completed is recorded as `resolved` with its
   receipt; while a sent link can still be used it waits; otherwise it closes the session
-  and records `cancelled` / `call_dropped` on the ticket.
+  and records `cancelled` on the ticket (`caller_cancelled` if the agent ended the call,
+  otherwise `call_dropped`).
 
 ## Operations
 
 | Task | How |
 |---|---|
 | Is it up, which version? | `GET /health` |
-| Logs | Application Insights `traces`. Messages: `CallStarted <session>`, `ToolCalled <session> <tool> <status>`, `CallEnded <session> <reason> <seconds>`, `VoiceLiveError <session> <code> <param>`, `ResponseNotCompleted`, `CallStepFailed`, `Open session check: <n> settled`, `Ticket <action> failed`. Logs carry IDs, states, status codes and exception types only. |
+| Logs | Application Insights `traces`. Messages: `CallStarted <session>`, `ToolCalled <session> <tool> <status>`, `CallEnded <session> <reason> <seconds>`, `VoiceLiveError <session> <code> <param>`, `ResponseNotCompleted`, `CallConnectionClosed`, `CallStepFailed`, `Open session check: <n> settled`, `Ticket <action> failed`, `TwilioWebhookChecked <signature or call lookup> Genuine=<true/false>`. Logs carry IDs, states, status codes and exception types only. |
 | Example query | `traces \| where timestamp > ago(1h) \| order by timestamp desc \| take 100` |
 | Call sessions | Container `state`, blobs `sessions/<sessionId>.json` (state, IDs, ticket outcome, receipt; never codes, tokens or passwords) |
 | Transcripts (debug aid) | Container `transcripts`, `yyyy/MM/dd/<sessionId>.json`, masked, deleted after 7 days. Download with `az storage blob download --auth-mode login ...` (needs a Storage Blob Data role for your account). |
@@ -246,6 +253,7 @@ What to expect after a restart:
 | Boundary | What crosses it | Protection |
 |---|---|---|
 | Caller to agent page | Access code, microphone audio | The code is posted as JSON (never in the URL), compared in constant time, rate limited to 5 attempts per minute per address, and exchanged for a cookie (`__Host-vr-access`, HttpOnly, SameSite Strict, 2 hours). `/voice/ws` needs the cookie and accepts only the page's own origin. The gate limits who can spend money; it never proves identity. |
+| Phone carrier (Twilio) to app | Incoming-call webhook, call audio | The webhook must carry a valid `X-Twilio-Signature` (or, unsigned from a trial number, be a live call on the account, checked with Twilio's API). It answers with a one-time 30 s token, and `/phone/stream` starts a session only with that token. No access code; the caller's number is never used or logged. |
 | Caller's speech to the model | Audio and its transcription | Everything the caller says is data, not instructions. Spoken secrets reach Voice Live (audio and speech-to-text); the agent never asks for or repeats a password. |
 | Model to backend | Tool calls | Seven tools; only `username` and `code` take an argument. Extra or unknown arguments are refused. The session comes from the WebSocket, never from the model. `RecoveryWorkflow` checks every tool against the call's state. |
 | Agent to issuer | HTTPS to `/mock/v1/...` | Service credential (Bearer). No issuer response contains a code, token, link, password or inbox content. |
@@ -282,7 +290,7 @@ The mock follows [the mock contract](../../docs/mock-contract.md) under the base
   state stay on Azure. Phone callers need no access code, so the budget alert, the call
   time limit and the silence goodbye are what limit cost. A US toll-free number is usually
   not reachable from outside the US.
-- Desktop Chrome and Edge only. English only. No outbound calls, no transfer to a person
+- Pages: desktop Chrome and Edge only. English only. No outbound calls, no transfer to a person
   (an escalation ticket is recorded instead), no callback.
 - Captions (both sides) are shown on the browser page only; the phone has no screen.
 
@@ -294,8 +302,9 @@ The mock follows [the mock contract](../../docs/mock-contract.md) under the base
   Service plan runs one instance.
 - **A live call is lost on restart.** Its session and ticket survive and are settled by the
   open-session check (see above).
-- **No cap on concurrent calls** and no rate limit on `/voice/ws`. Anyone with the shared
-  access code can open several 10-minute calls; only a budget alert limits the cost.
+- **No cap on concurrent calls** and no rate limit on `/voice/ws` or the phone number.
+  Anyone with the shared access code, or anyone who calls the number, can hold 10-minute
+  calls; only the silence goodbye, the time limit and a budget alert limit the cost.
 - Records grow without limit: the mock state document is rewritten on every change and
   searched linearly, and session blobs are never deleted.
 - A tool call runs inside the call's event loop, so a slow issuer answer (up to the 10 s
@@ -347,5 +356,5 @@ az cognitiveservices account purge --name ai-voicereset-<suffix> --resource-grou
 
 A deleted AI Services account keeps its name for a while (soft delete). Purge it, or use a
 new suffix, before running the setup script again. Role assignments on the deleted
-resources go with them. Locally, nothing is left behind when `Storage:BlobEndpoint` is
-empty.
+resources go with them. In Twilio, release the numbers (they cost a monthly fee). Locally,
+nothing is left behind when `Storage:BlobEndpoint` is empty.

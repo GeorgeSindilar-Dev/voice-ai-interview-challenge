@@ -1,6 +1,7 @@
 # Architecture
 
-An inbound, voice-assisted password reset. The caller talks to an automated agent, proves
+An inbound, voice-assisted password reset. The caller phones an automated agent (a browser
+voice page is a second way in, to test without a phone), proves
 access to a registered recovery inbox by reading a code from it, gets a reset link in the
 same inbox, and types the new password in a browser form. The agent never sees the inbox,
 the link or the password, and it says the password was reset only when the issuer has a
@@ -12,12 +13,15 @@ How to deploy and run it, and the known limitations, are in [SETUP.md](SETUP.md)
 
 ```mermaid
 flowchart LR
+  PH["Caller's phone"]
+  TW["Twilio: US number, media stream"]
   subgraph Browser["Caller's browser"]
     AP["Agent page /"]
     IN["Recovery inbox /mock/inbox"]
     RF["Reset form /reset/"]
   end
   subgraph App["App Service: one ASP.NET Core app"]
+    PE["Phone endpoints /phone/incoming, /phone/stream (ITelephonyProvider)"]
     VS["VoiceSession, one per call"]
     TD["ToolDispatcher"]
     RW["RecoveryWorkflow, the state machine"]
@@ -29,7 +33,9 @@ flowchart LR
   ST[("Blob Storage: state, transcripts")]
   AI["Application Insights"]
 
-  AP -- "audio over WebSocket /voice/ws" --> VS
+  PH -- "phone call" --> TW
+  TW -- "signed webhook, then audio over WebSocket (μ-law 8 kHz)" --> PE --> VS
+  AP -- "audio over WebSocket /voice/ws (PCM 24 kHz)" --> VS
   VS <--> VL
   VS --> TD --> RW --> IC
   IC -- "HTTPS, service credential" --> MI
@@ -44,9 +50,9 @@ flowchart LR
 
 | Part | Folder | What it does |
 |---|---|---|
-| Access gate | `Features/Access/` | Exchanges the shared access code for a cookie before the voice socket opens. Limits cost, not identity. |
-| Audio channel | `Features/Voice/BrowserAudioChannel.cs`, `IAudioChannel.cs` | Moves audio only: PCM16 24 kHz frames in both directions, plus `clear` (barge-in), `caption` (agent and caller lines; the caller's with a spoken password masked) and `ended` messages. No behaviour lives here. |
-| Phone channel | `Features/Phone/` | Carrier-neutral routes behind `ITelephonyProvider`, one-time stream tokens; the Twilio implementation (`Twilio/`: signature check, TwiML, μ-law 8 kHz media stream) feeds the same voice session. |
+| Phone channel | `Features/Phone/` | The main way in. Carrier-neutral routes behind `ITelephonyProvider`, one-time stream tokens; the Twilio implementation (`Twilio/`: signature check, TwiML, μ-law 8 kHz media stream) feeds the voice session. |
+| Browser audio channel | `Features/Voice/BrowserAudioChannel.cs` | The second way in, for the agent page. Moves audio only: PCM16 24 kHz frames in both directions, plus `clear` (barge-in), `caption` (agent and caller lines; the caller's with a spoken password masked) and `ended` messages. Both channels implement `IAudioChannel`; no behaviour lives in them. |
+| Access gate | `Features/Access/` | For the agent page only: exchanges the shared access code for a cookie before the browser voice socket opens. Limits cost, not identity. |
 | Voice session | `Features/Voice/VoiceSession.cs` | One call. Sends the session settings, pumps caller audio to Voice Live, handles its events one at a time, runs tools, enforces the time limit and silence handling, ends the call, writes the transcript. |
 | Voice Live settings | `Features/Voice/VoiceLiveSettings.cs`, `system-prompt.md` | Shared by every channel: model mode, voice, en-US transcription, semantic turn detection with barge-in, noise suppression, echo cancellation, the seven tools, the prompt. |
 | Tools | `Features/Voice/ToolDefinitions.cs`, `ToolDispatcher.cs` | Seven narrow tools. The dispatcher parses the model's arguments strictly and maps one call to one workflow method; the session ID comes from the connection. |
@@ -66,8 +72,9 @@ flowchart LR
 
 ## Call flow
 
-The normal journey. Each tool call goes VoiceSession → ToolDispatcher → RecoveryWorkflow,
-and its result (`ok`, `status`, `say`) goes back to the model.
+The normal journey, the same for a phone and a browser caller (see [Phone channel](#phone-channel)
+for how a phone call reaches the session). Each tool call goes VoiceSession → ToolDispatcher →
+RecoveryWorkflow, and its result (`ok`, `status`, `say`) goes back to the model.
 
 ```mermaid
 sequenceDiagram
@@ -77,7 +84,7 @@ sequenceDiagram
   participant S as VoiceSession and workflow
   participant I as Mock issuer
   participant X as Inbox and reset form
-  C->>S: access code, then WebSocket /voice/ws
+  C->>S: phone call via Twilio (/phone/incoming, /phone/stream), or browser: access code, then /voice/ws
   S->>V: session settings, then caller audio
   V-->>C: greeting, says it is an automated AI assistant
   C->>V: username, confirms the read-back
@@ -111,11 +118,11 @@ How a call ends:
 | Agent calls `end_call` | `agent_ended` | Fixed goodbye, then the call closes (within 15 s, confirmed or not) |
 | Time limit (`Limits:MaxCallSeconds`, 600 s) | `time_limit` | Fixed time-limit goodbye |
 | 30 s of silence, then 60 s more (the caller talking never counts) | `no_input` | "Are you still there?", then a fixed goodbye |
-| Caller hangs up, tab closes, socket breaks | `call_dropped` | Nothing more is said |
-| Voice Live unreachable or settings rejected | `unavailable` | The page shows that the voice service is unavailable |
+| Caller hangs up (phone or tab), connection breaks | `call_dropped` | Nothing more is said |
+| Voice Live unreachable or settings rejected | `unavailable` | The page shows that the voice service is unavailable; a phone call ends |
 
-At the end of every call the workflow records the ticket outcome, then the page gets the
-reason, then the masked transcript is saved.
+At the end of every call the workflow records the ticket outcome, then the channel gets the
+reason (the page shows it), then the masked transcript is saved.
 
 ## Recovery state machine
 
@@ -178,7 +185,8 @@ The strongest guardrails are in code. The prompt helps, but it is not a security
 | Fixed lines are exact | Code: the safe line, "Are you still there?", the time-limit line and the goodbye are sent as pre-generated messages, so Voice Live speaks them word for word. |
 | Limits | Code: maximum call length, silence handling, 300 output tokens per response. |
 | Scope and honesty | Prompt: password reset only, English only (transcription is en-US), says it is an automated AI assistant, answers "are you a person?" honestly, safety line for callers in danger. |
-| Voice behaviour | Settings: semantic turn detection, barge-in (interrupt and truncate, the page drops unplayed audio), deep noise suppression, echo cancellation, short answers. |
+| Phone entry | Code: only a signed webhook (or, from a trial number, a call Twilio confirms) gets a one-time token, and only that token opens a phone session. Caller ID is never used. |
+| Voice behaviour | Settings: semantic turn detection, barge-in (interrupt and truncate; the page, or Twilio on a `clear` message, drops unplayed audio), deep noise suppression, echo cancellation, short answers. |
 | Logs and transcripts | Code: logs carry IDs, states, status codes and exception types only; never tool arguments, transcript text or request bodies. Transcripts mask links, digit runs and anything after "password is". |
 | Browser | Code: strict CSP with no inline script, server text inserted with `textContent`, token removed from the address bar, `no-referrer`, `no-store`, `__Host-` cookies with SameSite Strict, origin check on the voice socket, JSON-only mock routes that reject unknown fields. |
 
@@ -218,6 +226,7 @@ connection end with the process.
 | Data | Where | Notes |
 |---|---|---|
 | Access code, service credential, synthetic users' passwords | App Service settings | Generated by the setup script, never printed or committed |
+| Twilio auth token | App Service setting `Phone__Twilio__AuthToken` | Entered by the owner in the portal, never committed |
 | Voice Live and Storage access | Managed identity | No keys in the app |
 | Call sessions | Blob `state/sessions/<id>.json` | Username, IDs, keys, outcome, receipt |
 | Mock issuer state | Blob `state/mock/state.json` | Recoveries (hashes only), inbox messages (code and link in plain text), password hashes, tickets |
@@ -227,8 +236,8 @@ connection end with the process.
 
 ## Phone channel
 
-The phone is a second `IAudioChannel` on the same `VoiceSession`, so behaviour, tools and
-guardrails are identical. The routes (`Features/Phone/PhoneEndpoints.cs`) only use
+The phone is the main way in. It is an `IAudioChannel` on the same `VoiceSession` as the
+browser page, so behaviour, tools and guardrails are identical. The routes (`Features/Phone/PhoneEndpoints.cs`) only use
 `ITelephonyProvider`; the carrier is `Features/Phone/Twilio/` (`TwilioProvider`,
 `TwilioSignature`, `TwilioAudioChannel`), chosen by one registration in `AddPhone`. Another
 carrier is a new implementation of that interface. A US number from Twilio carries the call;
@@ -264,6 +273,27 @@ sequenceDiagram
   has played everything before it, then closes the stream, and Twilio hangs up.
 - The caller's number is never used or logged: caller ID is not proof of identity.
 
+## Code conventions
+
+- **Simplest design that does the job.** No speculative features or layers; every line should
+  be explainable.
+- **Folders by feature** (`Features/Voice`, `Features/Recovery`, `Features/Phone`, ...); code
+  that is not a feature lives in `Shared/`. `Program.cs` only wires things up.
+- **Minimal APIs per feature**, handlers as named methods in small static endpoint classes.
+  Options classes are validated at startup; business code never reads configuration.
+- **Interfaces only at real boundaries:** `IJsonStore`, `ITranscriptWriter`, `IAudioChannel`,
+  `IVoiceLiveConnection`, `ITelephonyProvider`. Tests use small hand-written fakes, no mocking
+  library.
+- **Expected failures are return values** (`ToolResult`, `IssuerResult`, `MockResult`);
+  exceptions are for bugs and infrastructure faults.
+- **Async with `CancellationToken` everywhere; `TimeProvider`** wherever time matters (code and
+  link expiry, timers), so tests run on a fake clock.
+- **Structured logs** (`[LoggerMessage]`) with IDs, states and status codes only.
+- Nullable reference types on, warnings are errors in Release, classes `sealed` by default,
+  records for immutable data. Pages are static HTML with small vanilla JavaScript; server
+  text is inserted with `textContent` only.
+- **Tests:** xUnit, names like `SubmitCode_SecondWrongCode_EscalatesAsExhausted`, deterministic.
+
 ## Decisions and trade-offs
 
 | Decision | Why | Cost |
@@ -273,15 +303,16 @@ sequenceDiagram
 | Fixed backend sentences instead of free model speech | Truthful, non-enumerating, testable | Less natural wording |
 | JSON documents in Blob Storage instead of a database | Simplest durable store that survives restarts | Last-writer-wins, so one instance only; documents grow |
 | Polling reconciliation every minute instead of callbacks | Simple and survives restarts | A ticket can show `pending` for up to a minute after the reset |
-| Shared access code on the agent page | Keeps strangers from spending Voice Live minutes | Not identity; anyone with the code can call |
-| Browser channel first, phone as a second audio channel | The browser needed no phone number and tests the same session | Two channels to keep working; the phone carrier is Twilio, not ACS |
+| Shared access code on the agent page | Keeps strangers from spending Voice Live minutes | Not identity; anyone with the code can call. The phone has no code: anyone with the number can call |
+| Phone as the main channel, a browser page as a second audio channel on the same session | The browser page was built first (no number needed) and still lets anyone test the agent without a phone | Two channels to keep working; the phone carrier is Twilio, not ACS |
 | One-time token from the signed webhook to the media stream | Does not depend on how the carrier authenticates WebSockets | Tokens are in memory: a restart between webhook and stream drops that call |
 | Managed identity; secrets in App Service settings | No keys in code; simple | No Key Vault, no rotation |
 | One B1 instance with Always On | Cheap, matches the single-instance design | No scale-out or zone redundancy |
 
 Cost drivers: Voice Live usage per call minute (speech in and out plus the model) is the
-main variable cost; the B1 plan is a fixed monthly cost; storage and Application Insights
-are small at this volume.
+main variable cost; Twilio adds a small per-minute charge for phone calls and a monthly
+fee per number; the B1 plan is a fixed monthly cost; storage and Application Insights are
+small at this volume.
 
 Before real production I would change: a database with optimistic concurrency (or blob
 ETags) and per-account locking so the app can scale out; a cap on concurrent calls per
