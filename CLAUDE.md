@@ -3,8 +3,8 @@
 ## Project
 
 An inbound, voice-assisted password reset agent on Azure: Azure Voice Live (speech +
-LLM) behind an ASP.NET Core (.NET 10) app, reachable from a browser voice page (the
-phone through ACS comes later, if a number can be obtained).
+LLM) behind an ASP.NET Core (.NET 10) app, reachable by phone (a Twilio number; ACS
+numbers were not available) and from a browser voice page.
 
 - Specification (do not modify these root files): [README.md](README.md),
   [docs/mock-contract.md](docs/mock-contract.md),
@@ -14,15 +14,11 @@ phone through ACS comes later, if a number can be obtained).
 - **Working notes:** `.notes/` (committed, so local and cloud sessions share them; never put
   secrets, tenant/subscription IDs, emails or company names there).
   - Start here: [.notes/context.md](.notes/context.md) (owner preferences, status, Azure situation)
-  - The plan we follow: [.notes/plan.md](.notes/plan.md); task plans and the reconciliation
-    notes (real names after each task): [.notes/plans/](.notes/plans/)
-  - Remaining work: [solution/docs/remaining-work.md](solution/docs/remaining-work.md)
-  - Verified Voice Live / ACS API details:
-    [.notes/archive/overnight/research/sdk-reference.md](.notes/archive/overnight/research/sdk-reference.md)
-  - Guardrails research:
-    [.notes/archive/overnight/research/guardrails-research.md](.notes/archive/overnight/research/guardrails-research.md)
-  - .NET practices:
-    [.notes/archive/overnight/research/dotnet-best-practices.md](.notes/archive/overnight/research/dotnet-best-practices.md)
+  - Remaining work: [.notes/remaining-work.md](.notes/remaining-work.md)
+  - Audits and their resolutions: [.notes/audit/](.notes/audit/)
+  - Verified Voice Live / ACS API details: [.notes/research/sdk-reference.md](.notes/research/sdk-reference.md)
+  - Guardrails research: [.notes/research/guardrails-research.md](.notes/research/guardrails-research.md)
+  - Planning (challenge walkthrough, guardrails plan): [.notes/planning/](.notes/planning/)
 - `solution/` (code and its docs) is only about the agent: no notes about the hiring
   process, submission or meetings there. Such planning material lives in `.notes/`.
 
@@ -36,7 +32,7 @@ phone through ACS comes later, if a number can be obtained).
   decides; the model only proposes.
 - State (sessions, mock state) is saved as JSON files in Blob Storage. Open sessions
   are checked on startup after a restart.
-- Channels (browser, later phone) only carry audio. All behaviour lives in the
+- Channels (browser, phone) only carry audio. All behaviour lives in the
   shared voice session.
 - Secrets are in App Service app settings. Managed identity
   (`DefaultAzureCredential`) for Voice Live and Storage. Application Insights for

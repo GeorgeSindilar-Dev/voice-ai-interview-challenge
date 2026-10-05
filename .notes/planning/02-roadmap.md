@@ -3,7 +3,7 @@
 The high-level steps for the whole challenge, in a sensible order. These are not
 tasks yet: for each step we will later define concrete tasks.
 
-**The plan we follow:** [docs/plan.md](../plan.md) (lean version). This roadmap was the starting point; the overnight production-grade plans are archived in [docs/archive/overnight/](../archive/overnight/README.md).
+**The plan we follow:** the lean plan (built; history in git). This roadmap was the starting point.
 
 **Deadline:** initial submission by Monday, 2026-10-05. The recorded video comes
 later, after the interviewer sends feedback.
@@ -50,7 +50,7 @@ Settle the open decisions:
 - what we consciously leave out
 
 ### 2. Research
-Run the two research items in [TODO.md](../../TODO.md): coding best practices for
+Run the two research items in the research list (done): coding best practices for
 the chosen stack, and guardrails used by similar voice agents. Feed the results
 into CLAUDE.md.
 
@@ -82,7 +82,7 @@ The mocks run as **their own web app** (same App Service plan, no extra cost), w
 their own data, so our voice backend can't read inbox contents, codes or tokens.
 Synthetic users' inbox logins are shared privately, never committed.
 
-They follow [docs/mock-contract.md](../../../docs/mock-contract.md) closely.
+They follow [docs/mock-contract.md](../../docs/mock-contract.md) closely.
 
 ### 6. Build the backend core (no voice yet)
 The recovery state machine, the session store, the clients for the issuer and
@@ -233,7 +233,7 @@ reviews it for completeness and consistency. There are four areas, all in `docs/
 
   The same guide covers the assessors' isolated restart testing (deploy your own
   copy).
-- **[requirements-checklist.md](../submission/requirements-checklist.md)**: every
+- **requirements checklist** (replaced by the spec audits in `../audit/`): every
   README and mock-contract requirement, ticked only with evidence.
 - the draft submission `notes` (assumptions and limitations)
 - video preparation: the talking points, mapped to the README's walkthrough prompts

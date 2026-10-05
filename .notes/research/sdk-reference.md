@@ -498,7 +498,7 @@ From [Speech quotas](https://learn.microsoft.com/en-us/azure/ai-services/speech-
 - Full-stack official sample (C# backend plus browser worklets): https://github.com/microsoft-foundry/voicelive-samples/tree/main/voice-live-universal-assistant
 - How-to: https://learn.microsoft.com/en-us/azure/ai-services/speech-service/voice-live-how-to
 - API reference 2026-07-15: https://learn.microsoft.com/en-us/azure/ai-services/speech-service/voice-live-api-reference-2026-07-15
-- Node reference implementation (behavior model): the pinned "IT help desk password-reset gallery demo" linked in the challenge [README](../../../README.md) (folder `docs/templates/it-helpdesk-password-reset/code` at commit `ea32df55`)
+- Node reference implementation (behavior model): the pinned "IT help desk password-reset gallery demo" linked in the challenge [README](../../README.md) (folder `docs/templates/it-helpdesk-password-reset/code` at commit `ea32df55`)
 
 ### A.13 UNVERIFIED / risks
 

@@ -24,29 +24,18 @@ Facts and owner preferences that aren't obvious from the code. Read with `CLAUDE
 - **Never run `dotnet dev-certs https --trust`** (it changes the Windows certificate store); the owner
   runs it if needed.
 
-## Status (2026-10-04)
-- Branch `ccr-cdb850f7-bdrj41` (from a cloud session): page design (one card design, colour, icons),
-  two audits and the tester feedback in `audit/`, and the fixes for them (commit bdfc66a, 89 tests).
-  To be squash-merged into `main`, then deployed and tested live.
-- The `invalid_session_update_message` error is solved (audio was sent before the settings).
-- Next: deploy, one full live journey (check the username letters and latency), then the Twilio number.
-
-## Status (2026-10-03, evening)
-- Code: T1â€“T15 done; later work was squash-merged to `main` (6d9c977).
-  81 tests, 0 warnings. T16 docs not written yet; an unreviewed draft is in `drafts/SETUP-draft.md`.
-- Remaining work: `solution/docs/remaining-work.md`.
-- Implementation process used: superpowers subagent-driven development: implementer â†’ spec review â†’
-  code-quality review â†’ fixes, per task. Plans: `plans/` (`00-contracts.md`, `00-reconciliation.md`
-  wins over the task plans and records the real names after each task).
-- Added after deployment (on `deploy-azure`):
-  - `/mock/login`: a mock work-account sign-in (Razor page `Pages/Mock/Login`). It only checks the
-    password (`MockIssuer.CheckPasswordAsync`: current hash or `InitialPassword`) and shows success or
-    failure. Intended flow: try to sign in â†’ "Forgot your password?" link to the agent page â†’ call â†’
-    inbox (new tab, linked from the agent page) â†’ reset form â†’ "Sign in with your new password" link
-    back to `/mock/login`.
-  - Prompt step 5: before `end_call` the agent asks "anything else?"; "thank you"/"okay" alone is not a
-    goodbye. (In the first test the model hung up on a plain "thank you".)
-  - `VoiceLiveError` logs now include the rejected parameter name (`Param`), never the message text.
+## Status (2026-10-05)
+- `main` (dcbd930, deployed, 99 tests): phone channel (Twilio behind `ITelephonyProvider`), SETUP and
+  architecture docs, fixes from the second spec and adversarial audits (`audit/`), live-test fixes.
+- Phone: a US local number (owner tests from Romania) works end to end; the US toll-free number
+  (submission) uses the same webhook but still needs one call from the US. Twilio blocks forwarding
+  from the account to its own toll-free number (error 13225, "blacklisted").
+- Submission: `submission.json` drafted at the repo root (gitignored). Before sending: reset the demo
+  state (stop the app, delete blob `state/mock/state.json`, start it), make sure `/health` shows the
+  submitted `commit_sha`, share the inbox sign-ins and access code separately.
+- Remaining work: `remaining-work.md`.
+- Implementation history (task plans, overnight research) was removed from the tree on 2026-10-05; it
+  is still in git history.
 
 ## Azure (deployed)
 - Owner's own pay-as-you-go subscription, now with about $200 credit. Budget `budget-voicereset`:
@@ -103,6 +92,6 @@ Facts and owner preferences that aren't obvious from the code. Read with `CLAUDE
   (μ-law 8 kHz straight to Voice Live; a local probe confirmed transcription at 8 kHz).
 
 ## Useful references
-- Verified Voice Live 1.2.0 / ACS facts: `archive/overnight/research/sdk-reference.md`.
-- Guardrails research (attack scenarios, prompt draft): `archive/overnight/research/guardrails-research.md`.
+- Verified Voice Live 1.2.0 / ACS facts: `research/sdk-reference.md`.
+- Guardrails research (attack scenarios, prompt draft): `research/guardrails-research.md`.
 - Challenge-related planning (roadmap, walkthrough, requirements checklist): `planning/`, `submission/`.

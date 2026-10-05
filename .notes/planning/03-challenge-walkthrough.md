@@ -1,7 +1,7 @@
 # The challenge, step by step
 
 What the voice agent (and the system behind it) must do, explained in order.
-Sources: [README.md](../../../README.md) and [docs/mock-contract.md](../../../docs/mock-contract.md).
+Sources: [README.md](../../README.md) and [docs/mock-contract.md](../../docs/mock-contract.md).
 
 ---
 
