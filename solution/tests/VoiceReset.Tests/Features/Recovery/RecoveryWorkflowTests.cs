@@ -158,5 +158,39 @@ public sealed class RecoveryWorkflowTests
         Assert.Equal((RecoveryState.Completed, "resolved"), (session?.State, session?.TicketOutcome));
     }
 
+    [Fact]
+    public async Task ReportNoBrowser_AfterRecoveryStarted_EscalatesAsBrowserUnavailable()
+    {
+        await using var app = new RecoveryAppFactory();
+        var id = await app.StartRecoveryAsync(Spoken, Ct);
+
+        var result = await app.Workflow.ReportNoBrowserAsync(id, Ct);
+
+        Assert.Equal(new ToolResult(true, "escalated", $"{Phrases.NoBrowser} {Phrases.TicketCreated}"), result);
+        var session = await app.SessionAsync(id, Ct);
+        Assert.Equal((RecoveryState.Escalated, "escalated", "browser_unavailable"), (session?.State, session?.TicketOutcome, session?.TicketReason));
+    }
+
+    [Fact]
+    public async Task CheckResetStatus_HumanRequestedAfterLinkThenReset_SaysSuccessAndKeepsEscalation()
+    {
+        // Arrange: the caller asks for a person after the link was sent, then finishes the form anyway
+        await using var app = new RecoveryAppFactory();
+        var id = await app.StartRecoveryAsync(Spoken, Ct);
+        await app.Workflow.SubmitCodeAsync(id, await app.InboxCodeAsync(Ct), Ct);
+        await app.Workflow.SendResetLinkAsync(id, Ct);
+        await app.Workflow.RequestHumanAsync(id, Ct);
+        await app.CompleteResetAsync(await app.InboxLinkAsync(Ct), Ct);
+
+        // Act
+        var result = await app.Workflow.CheckResetStatusAsync(id, Ct);
+
+        // Assert: the true result is said; the human-requested escalation stays on the ticket
+        Assert.Equal(Phrases.Completed, result.Say);
+        var session = await app.SessionAsync(id, Ct);
+        Assert.Equal((RecoveryState.Completed, "escalated"), (session?.State, session?.TicketOutcome));
+        Assert.NotNull(session?.ResetReceipt);
+    }
+
     private static string WrongCode(string code) => code == "000000" ? "111111" : "000000";
 }

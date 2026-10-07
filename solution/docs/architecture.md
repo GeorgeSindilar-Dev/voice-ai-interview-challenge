@@ -51,11 +51,11 @@ flowchart LR
 | Part | Folder | What it does |
 |---|---|---|
 | Phone channel | `Features/Phone/` | The main way in. Carrier-neutral routes behind `ITelephonyProvider`, one-time stream tokens; the Twilio implementation (`Twilio/`: signature check, TwiML, μ-law 8 kHz media stream) feeds the voice session. |
-| Browser audio channel | `Features/Voice/BrowserAudioChannel.cs` | The second way in, for the agent page. Moves audio only: PCM16 24 kHz frames in both directions, plus `clear` (barge-in), `caption` (agent and caller lines; the caller's with a spoken password masked) and `ended` messages. Both channels implement `IAudioChannel`; no behaviour lives in them. |
+| Browser audio channel | `Features/Voice/BrowserAudioChannel.cs` | The second way in, for the agent page. Moves audio only: PCM16 24 kHz frames in both directions, plus `clear` (barge-in), `caption` (agent and caller lines; the caller's with what looks like a password masked) and `ended` messages. Both channels implement `IAudioChannel`; no behaviour lives in them. |
 | Access gate | `Features/Access/` | For the agent page only: exchanges the shared access code for a cookie before the browser voice socket opens. Limits cost, not identity. |
 | Voice session | `Features/Voice/VoiceSession.cs` | One call. Sends the session settings, pumps caller audio to Voice Live, handles its events one at a time, runs tools, enforces the time limit and silence handling, ends the call, writes the transcript. |
-| Voice Live settings | `Features/Voice/VoiceLiveSettings.cs`, `system-prompt.md` | Shared by every channel: model mode, voice, en-US transcription, semantic turn detection with barge-in, noise suppression, echo cancellation, the seven tools, the prompt. |
-| Tools | `Features/Voice/ToolDefinitions.cs`, `ToolDispatcher.cs` | Seven narrow tools. The dispatcher parses the model's arguments strictly and maps one call to one workflow method; the session ID comes from the connection. |
+| Voice Live settings | `Features/Voice/VoiceLiveSettings.cs`, `system-prompt.md` | Shared by every channel: model mode, voice, en-US transcription, semantic turn detection with barge-in, noise suppression, echo cancellation, the eight tools, the prompt. |
+| Tools | `Features/Voice/ToolDefinitions.cs`, `ToolDispatcher.cs` | Eight narrow tools. The dispatcher parses the model's arguments strictly and maps one call to one workflow method; the session ID comes from the connection. |
 | Recovery workflow | `Features/Recovery/RecoveryWorkflow.cs` | The state machine. Checks each tool against the call's state, calls the issuer, records the ticket outcome, returns the sentence to say. |
 | Phrases | `Features/Recovery/Phrases.cs` | Every sentence about the reset that the agent may say. The same words for every username. |
 | Spoken input | `Features/Recovery/SpokenInput.cs` | Turns speech-to-text into a username or exactly six digits, or nothing. Never guesses. |
@@ -142,6 +142,7 @@ stateDiagram-v2
   LinkSent --> CancelledLinkOut: cancel_reset
   CancelledLinkOut --> Completed: issuer status completed with receipt
   CancelledLinkOut --> Cancelled: link expired unused
+  Escalated --> Completed: link was out, issuer status completed with receipt
   Completed --> [*]
   Escalated --> [*]
   Cancelled --> [*]
@@ -149,9 +150,10 @@ stateDiagram-v2
 
 `AwaitingUsername`, `AwaitingCode`, `Verified` and `LinkSent` are open. From any of them, `cancel_reset` (or a call that
 is over and has been settled) leads to `Cancelled`; from `LinkSent` it leads to `CancelledLinkOut`, which the
-open-session check keeps watching until the link is used or expires. `request_human` leads to
-`Escalated` once a recovery has started. The three final states never change; asking again
-only repeats the outcome.
+open-session check keeps watching until the link is used or expires. `request_human` and `report_no_browser` lead to
+`Escalated` once a recovery has started. `Completed` and `Cancelled` never change; `Escalated`
+moves to `Completed` only when a link was out and the issuer reports the reset done (the
+ticket keeps a human-requested escalation). Asking again only repeats the outcome.
 
 Ticket outcomes follow the state. The ticket is created as soon as a recovery starts, so
 any later failure can be escalated.
@@ -162,7 +164,8 @@ any later failure can be escalated.
 | Two wrong codes | `escalated` / `verification_exhausted` |
 | Code expired | `escalated` / `verification_expired` |
 | Link expired before a reset, or reset failed | `escalated` / `browser_unavailable` or `dependency_unavailable` |
-| Caller wants a person or can't use a browser | `escalated` / `human_requested` (kept against any later update) |
+| Caller wants a person | `escalated` / `human_requested` (kept against any later update) |
+| Caller can't use a browser | `escalated` / `browser_unavailable` |
 | Caller cancels | `cancelled` / `caller_cancelled` (`resolved` later if a link sent before the cancel is used) |
 | Call ends while a link is out | `resolved` if the reset is already done, else `pending` / `completion_unknown` until the open-session check settles it |
 | Call ends otherwise, or no live call after a restart | `cancelled` / `caller_cancelled` or `call_dropped` |
@@ -187,7 +190,7 @@ The strongest guardrails are in code. The prompt helps, but it is not a security
 | Scope and honesty | Prompt: password reset only, English only (transcription is en-US), says it is an automated AI assistant, answers "are you a person?" honestly, safety line for callers in danger. |
 | Phone entry | Code: only a signed webhook (or, from a trial number, a call Twilio confirms) gets a one-time token, and only that token opens a phone session. Caller ID is never used. |
 | Voice behaviour | Settings: semantic turn detection, barge-in (interrupt and truncate; the page, or Twilio on a `clear` message, drops unplayed audio), deep noise suppression, echo cancellation, short answers. |
-| Logs and transcripts | Code: logs carry IDs, states, status codes and exception types only; never tool arguments, transcript text or request bodies. Transcripts mask links, digit runs and anything after "password is". |
+| Logs and transcripts | Code: logs carry IDs, states, status codes and exception types only; never tool arguments, transcript text or request bodies. Transcripts mask links, digit runs, words that mix letters and digits, and anything after "password … is". |
 | Browser | Code: strict CSP with no inline script, server text inserted with `textContent`, token removed from the address bar, `no-referrer`, `no-store`, `__Host-` cookies with SameSite Strict, origin check on the voice socket, JSON-only mock routes that reject unknown fields. |
 
 ## Reliability

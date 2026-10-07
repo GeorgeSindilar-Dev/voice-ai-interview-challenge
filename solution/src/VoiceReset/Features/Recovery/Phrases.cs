@@ -18,6 +18,7 @@ public static class Phrases
     public const string ResetFailed = "The reset didn't complete.";
     public const string LinkExpired = "The reset link expired before a reset was completed.";
     public const string HumanRequested = "I can't transfer you to a person.";
+    public const string NoBrowser = "I can't finish the reset without a browser.";
     public const string TicketCreated = "A help-desk ticket was created; no one has joined this call.";
     public const string TicketNotCreated = "I couldn't create a help-desk ticket, and no one has joined this call. Please contact your help desk directly.";
     public const string Cancelled = "OK, I've cancelled this reset.";

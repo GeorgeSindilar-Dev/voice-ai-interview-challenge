@@ -40,6 +40,7 @@ public sealed partial class ToolDispatcher(RecoveryWorkflow workflow, ILogger<To
                 ToolDefinitions.SendResetLink when HasOnly(args) => await workflow.SendResetLinkAsync(sessionId, ct),
                 ToolDefinitions.CheckResetStatus when HasOnly(args) => await workflow.CheckResetStatusAsync(sessionId, ct),
                 ToolDefinitions.RequestHuman when HasOnly(args) => await workflow.RequestHumanAsync(sessionId, ct),
+                ToolDefinitions.ReportNoBrowser when HasOnly(args) => await workflow.ReportNoBrowserAsync(sessionId, ct),
                 ToolDefinitions.CancelReset when HasOnly(args) => await workflow.CancelAsync(sessionId, ct),
                 ToolDefinitions.EndCall when HasOnly(args) => await EndCallAsync(sessionId, ct),
                 _ => s_invalidArgument,

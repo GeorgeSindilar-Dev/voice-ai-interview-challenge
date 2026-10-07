@@ -255,7 +255,7 @@ What to expect after a restart:
 | Caller to agent page | Access code, microphone audio | The code is posted as JSON (never in the URL), compared in constant time, rate limited to 5 attempts per minute per address, and exchanged for a cookie (`__Host-vr-access`, HttpOnly, SameSite Strict, 2 hours). `/voice/ws` needs the cookie and accepts only the page's own origin. The gate limits who can spend money; it never proves identity. |
 | Phone carrier (Twilio) to app | Incoming-call webhook, call audio | The webhook must carry a valid `X-Twilio-Signature` (or, unsigned from a trial number, be a live call on the account, checked with Twilio's API). It answers with a one-time 30 s token, and `/phone/stream` starts a session only with that token. No access code; the caller's number is never used or logged. |
 | Caller's speech to the model | Audio and its transcription | Everything the caller says is data, not instructions. Spoken secrets reach Voice Live (audio and speech-to-text); the agent never asks for or repeats a password. |
-| Model to backend | Tool calls | Seven tools; only `username` and `code` take an argument. Extra or unknown arguments are refused. The session comes from the WebSocket, never from the model. `RecoveryWorkflow` checks every tool against the call's state. |
+| Model to backend | Tool calls | Eight tools; only `username` and `code` take an argument. Extra or unknown arguments are refused. The session comes from the WebSocket, never from the model. `RecoveryWorkflow` checks every tool against the call's state. |
 | Agent to issuer | HTTPS to `/mock/v1/...` | Service credential (Bearer). No issuer response contains a code, token, link, password or inbox content. |
 | Inbox to caller | Code and reset link | A separate sign-in per synthetic user (`__Host-mock-inbox` cookie). The agent can't read the inbox. |
 | Reset form to issuer | Token and new password | The token is in the URL fragment (never sent to the server as part of the URL) and removed from the address bar. The password goes only to `/mock/v1/password/validate` and `/mock/v1/resets` over HTTPS. `no-store`, `no-referrer`, strict CSP. Never logged, never sent to the model. |
@@ -331,7 +331,8 @@ The mock follows [the mock contract](../../docs/mock-contract.md) under the base
   safe line, the silence and time-limit lines and the goodbye are sent as fixed messages
   and are spoken word for word.
 - **Transcript masking is best effort.** It masks links, digit runs (also spoken numbers
-  like "forty-seven") and everything after "password is / was / would be". It can miss
+  like "forty-seven"), words that mix letters and digits, and everything after "password
+  … is / was / would be" in the same sentence. It can miss
   other phrasings and over-masks other numbers. Transcripts are deleted after 7 days.
   Audio and text still pass through Voice Live.
 - **A link sent before a cancel stays valid** until it expires; the contract has no revoke.
@@ -343,8 +344,7 @@ The mock follows [the mock contract](../../docs/mock-contract.md) under the base
 **Conversation**
 
 - Within one call, a cancelled reset can't be restarted; the caller calls again.
-- Ticket reasons are coarse: "I can't use a browser" is recorded as `human_requested`, and
-  a call that hits the time limit as `call_dropped`.
+- A call that hits the time limit is recorded as `call_dropped` (the contract has no closer reason).
 - Unknown usernames never get a code, by design, so testers must use a synthetic username.
 
 ## Cleanup

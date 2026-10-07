@@ -4,7 +4,8 @@ namespace VoiceReset.Features.Transcripts;
 
 /// <summary>
 /// Masks secrets in one transcript turn before it is stored. Best effort: speech can be transcribed in many ways.
-/// Order matters: links first (they contain digits), then "password is/'s/: …" (rest of the turn), then digit runs.
+/// Order matters: links first (they contain digits), then "password … is/'s/: …" (rest of the turn), then words that
+/// mix letters and digits (they look like passwords, never like codes), then digit runs.
 /// </summary>
 public static partial class TranscriptMasker
 {
@@ -20,8 +21,9 @@ public static partial class TranscriptMasker
         return DigitRunPattern().Replace(masked, MaskRun);
     }
 
-    /// <summary>Only the "password is …" part: for the caller's own captions, where the code must stay visible.</summary>
-    public static string MaskPassword(string text) => PasswordPattern().Replace(text, "$1 [REDACTED]");
+    /// <summary>Only what looks like a password: for the caller's own captions, where the code must stay visible.</summary>
+    public static string MaskPassword(string text) =>
+        MixedWordPattern().Replace(PasswordPattern().Replace(text, "$1 [REDACTED]"), "[REDACTED]");
 
     /// <summary>A run like "oh four seven, double one two" or "forty-seven eleven" counts its digits; 3 or more → [CODE].</summary>
     private static string MaskRun(Match run)
@@ -44,9 +46,15 @@ public static partial class TranscriptMasker
     [GeneratedRegex(@"https?://\S+|www\.\S+", RegexOptions.IgnoreCase)]
     private static partial Regex UrlPattern();
 
-    // "password is", "password's", "password:", "password would be / will be / was", also "pass word".
-    [GeneratedRegex(@"\b(pass\s?word(?:\s+(?:is|was|would\s+be|will\s+be)\b|'s\b|:)).*", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
+    // "password is", "password's", "password:", "password would be / will be / was", also "pass word", and with words
+    // between them in the same sentence ("my password for Alex.Morgan is …"; a dot inside a word doesn't end it).
+    // Masks the rest of the turn: masking too much is fine.
+    [GeneratedRegex(@"\b(pass\s?word(?:'s\b|(?:[^.!?]|[.!?](?=\S))*?(?:\s(?:is|was|would\s+be|will\s+be)\b|:))).*", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
     private static partial Regex PasswordPattern();
+
+    // A word with both a letter and a digit, like "1234QWSD" or "Summer2026!".
+    [GeneratedRegex(@"(?<!\S)(?=\S*\p{L})(?=\S*\d)\S+")]
+    private static partial Regex MixedWordPattern();
 
     [GeneratedRegex("^(?:" + TwoDigitWords + ")$")]
     private static partial Regex TwoDigitWordPattern();

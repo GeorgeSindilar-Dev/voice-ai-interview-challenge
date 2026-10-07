@@ -7,12 +7,12 @@ namespace VoiceReset.Tests.Features.Voice;
 public sealed class ToolDefinitionsTests
 {
     [Fact]
-    public void All_Always_AreTheSevenContractTools()
+    public void All_Always_AreTheEightContractTools()
     {
         var names = ToolDefinitions.All.Select(tool => tool.Name);
 
         Assert.Equal(
-            ["start_recovery", "submit_code", "send_reset_link", "check_reset_status", "request_human", "cancel_reset", "end_call"],
+            ["start_recovery", "submit_code", "send_reset_link", "check_reset_status", "request_human", "report_no_browser", "cancel_reset", "end_call"],
             names);
     }
 

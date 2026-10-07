@@ -14,6 +14,10 @@ public sealed class TranscriptMaskerTests
     [InlineData("password: hunter 2", "password: [REDACTED]")]
     [InlineData("forty-seven, eleven, twenty", "[CODE]")]
     [InlineData("the new pass word would be Blue-Sky-Rocket", "the new pass word would be [REDACTED]")]
+    [InlineData("So, my password for the username Alex.Morgan is 1234QWSD and it is not working.",
+        "So, my password for the username Alex.Morgan is [REDACTED]")]
+    [InlineData("it's 1234QWSD, can you check it", "it's [REDACTED] can you check it")]
+    [InlineData("Your password has been reset. Is there anything else?", "Your password has been reset. Is there anything else?")]
     [InlineData("open https://app.example/reset/#token=abc123 now", "open [LINK] now")]
     [InlineData("I have 2 laptops", "I have 2 laptops")]
     [InlineData("Hello, I need to reset my password.", "Hello, I need to reset my password.")]
@@ -25,5 +29,15 @@ public sealed class TranscriptMaskerTests
 
         // Assert
         Assert.Equal(expected, masked);
+    }
+
+    [Fact]
+    public void MaskPassword_CaptionWithCodeAndPassword_KeepsOnlyTheCode()
+    {
+        // Act
+        var masked = TranscriptMasker.MaskPassword("the code is 047112 and my password for alex is 1234QWSD");
+
+        // Assert
+        Assert.Equal("the code is 047112 and my password for alex is [REDACTED]", masked);
     }
 }

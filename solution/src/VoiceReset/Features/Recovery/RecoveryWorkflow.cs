@@ -18,7 +18,6 @@ public sealed partial class RecoveryWorkflow(SessionStore sessions, IssuerClient
 
     private static readonly ToolResult s_notAllowed = new(false, "not_allowed", Phrases.NotAllowed);
     private static readonly ToolResult s_unavailable = new(false, UnavailableStatus, Phrases.NotAvailableNow);
-    private static readonly ToolResult s_noTicket = new(false, "no_ticket", $"{Phrases.HumanRequested} {Phrases.TicketNotCreated}");
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _locks = new();
 
     public async Task<string> StartSessionAsync(string channel, CancellationToken ct)
@@ -127,8 +126,10 @@ public sealed partial class RecoveryWorkflow(SessionStore sessions, IssuerClient
         {
             return CompletedResult(session.UnlockStatus);
         }
-        // Also after a cancel: the link sent before it can still have been used.
-        if (session is not { State: RecoveryState.LinkSent or RecoveryState.CancelledLinkOut, RecoveryId: { } recoveryId })
+        // Also after a cancel or an escalation: the link sent before it can still have been used.
+        var linkOut = session.State is RecoveryState.LinkSent or RecoveryState.CancelledLinkOut
+            || (session.State == RecoveryState.Escalated && session.LinkOperationId is not null);
+        if (!linkOut || session.RecoveryId is not { } recoveryId)
         {
             return s_notAllowed;
         }
@@ -144,14 +145,20 @@ public sealed partial class RecoveryWorkflow(SessionStore sessions, IssuerClient
         };
     }, ct);
 
-    public Task<ToolResult> RequestHumanAsync(string sessionId, CancellationToken ct) => RunAsync(sessionId, async session => session.State switch
-    {
-        RecoveryState.Completed or RecoveryState.Cancelled => s_notAllowed,
-        RecoveryState.Escalated => new(true, "escalated", TicketSentence(session)),
-        RecoveryState.AwaitingUsername => s_noTicket, // no recovery, so no ticket: the caller can still start a reset
-        _ => await EscalateAsync(
-            session, reason: "human_requested", ok: true, status: "escalated", firstSentence: Phrases.HumanRequested, ct),
-    }, ct);
+    public Task<ToolResult> RequestHumanAsync(string sessionId, CancellationToken ct) =>
+        EscalateOnRequestAsync(sessionId, "human_requested", Phrases.HumanRequested, ct);
+
+    public Task<ToolResult> ReportNoBrowserAsync(string sessionId, CancellationToken ct) =>
+        EscalateOnRequestAsync(sessionId, "browser_unavailable", Phrases.NoBrowser, ct);
+
+    private Task<ToolResult> EscalateOnRequestAsync(string sessionId, string reason, string firstSentence, CancellationToken ct) =>
+        RunAsync(sessionId, async session => session.State switch
+        {
+            RecoveryState.Completed or RecoveryState.Cancelled => s_notAllowed,
+            RecoveryState.Escalated => new(true, "escalated", TicketSentence(session)),
+            RecoveryState.AwaitingUsername => new(false, "no_ticket", $"{firstSentence} {Phrases.TicketNotCreated}"), // no recovery, so no ticket
+            _ => await EscalateAsync(session, reason, ok: true, status: "escalated", firstSentence, ct),
+        }, ct);
 
     public Task<ToolResult> CancelAsync(string sessionId, CancellationToken ct) => RunAsync(sessionId, async session =>
     {

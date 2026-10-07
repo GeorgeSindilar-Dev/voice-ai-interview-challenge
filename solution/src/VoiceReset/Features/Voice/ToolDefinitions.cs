@@ -2,7 +2,7 @@ using Azure.AI.VoiceLive;
 
 namespace VoiceReset.Features.Voice;
 
-/// <summary>The seven tools. Only username and code are parameters (the backend checks them again); no IDs or free text.</summary>
+/// <summary>The eight tools. Only username and code are parameters (the backend checks them again); no IDs or free text.</summary>
 public static class ToolDefinitions
 {
     public const string StartRecovery = "start_recovery";
@@ -10,6 +10,7 @@ public static class ToolDefinitions
     public const string SendResetLink = "send_reset_link";
     public const string CheckResetStatus = "check_reset_status";
     public const string RequestHuman = "request_human";
+    public const string ReportNoBrowser = "report_no_browser";
     public const string CancelReset = "cancel_reset";
     public const string EndCall = "end_call";
 
@@ -28,7 +29,9 @@ public static class ToolDefinitions
         Define(CheckResetStatus,
             "Check whether the caller finished the reset in the browser form. Use it when the caller says they are done.", NoArguments),
         Define(RequestHuman,
-            "Record an escalation for the help desk when the caller wants a person or cannot use a browser. It does not transfer the call.", NoArguments),
+            "Record an escalation for the help desk when the caller wants a person. It does not transfer the call.", NoArguments),
+        Define(ReportNoBrowser,
+            "Record an escalation for the help desk when the caller cannot use a browser to open the link. It does not transfer the call.", NoArguments),
         Define(CancelReset, "Cancel the password reset when the caller asks to stop.", NoArguments),
         Define(EndCall, "End the call when the conversation is finished. The system says goodbye.", NoArguments),
     ];
